@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -61,8 +63,19 @@ from handlers.scheduler import (
 )
 from handlers.settings import settings_dashboard, toggle_approval_workflow
 from utils.logger import get_logger
+from utils.telegram_safety import safe_answer
 
 logger = get_logger(__name__)
+CALLBACK_DATA_RE = re.compile(r"^[a-z_]+(?::[a-z0-9_]+)*$")
+
+
+def _parse_callback_int(data: str, *, prefix: str) -> int | None:
+    if not data.startswith(prefix):
+        return None
+    value = data.removeprefix(prefix)
+    if not value.isdigit():
+        return None
+    return int(value)
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -72,273 +85,290 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     data = query.data or ""
+    if not CALLBACK_DATA_RE.match(data):
+        await safe_answer(query, "Invalid callback data", show_alert=True)
+        logger.info("Rejected malformed callback payload: %s", data)
+        return
+
+    try:
+        await _dispatch_callback(update, context, data)
+    except Exception as exc:
+        logger.exception("Callback routing failure for data=%s: %s", data, exc)
+        await safe_answer(query, "Action failed. Please retry.", show_alert=True)
+
+
+async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str) -> None:
+    query = update.callback_query
+    if query is None:
+        return
+
     if data == "dashboard:channels":
-        await query.answer()
+        await safe_answer(query)
         await channel_dashboard(update, context)
         return
 
     if data == "dashboard:workspaces":
-        await query.answer()
+        await safe_answer(query)
         await workspace_dashboard_callback(update, context)
         return
 
     if data == "dashboard:posts":
-        await query.answer()
+        await safe_answer(query)
         await post_dashboard(update, context)
         return
 
     if data == "dashboard:scheduler":
-        await query.answer()
+        await safe_answer(query)
         await scheduler_dashboard(update, context)
         return
 
     if data == "dashboard:settings":
-        await query.answer()
+        await safe_answer(query)
         await settings_dashboard(update, context)
         return
 
     if data in {"dashboard:owner_system", "dashboard:owner_payments", "dashboard:owner_users", "dashboard:owner_health", "dashboard:owner_backup"}:
-        await query.answer()
+        await safe_answer(query)
         await owner_menu_callback(update, context)
         return
 
     if data in {"dashboard:admin_analytics", "dashboard:admin_subscription"}:
-        await query.answer()
+        await safe_answer(query)
         await admin_menu_callback(update, context)
         return
 
     if data == "dashboard:editor_approval":
-        await query.answer()
+        await safe_answer(query)
         await editor_menu_callback(update, context)
         return
 
     if data == "settings:dashboard":
-        await query.answer()
+        await safe_answer(query)
         await settings_dashboard(update, context)
         return
 
     if data == "settings:toggle_approval":
-        await query.answer()
+        await safe_answer(query)
         await toggle_approval_workflow(update, context)
         return
 
-    if data.startswith("provision:addadmin:confirm:"):
-        admin_id = int(data.split(":")[-1])
-        await query.answer()
+    admin_id = _parse_callback_int(data, prefix="provision:addadmin:confirm:")
+    if admin_id is not None:
+        await safe_answer(query)
         await add_admin_confirm_callback(update, context, admin_id)
         return
 
     if data == "provision:addadmin:cancel":
-        await query.answer()
+        await safe_answer(query)
         await add_admin_cancel_callback(update, context)
         return
 
-    if data.startswith("provision:addeditor:confirm:"):
-        editor_id = int(data.split(":")[-1])
-        await query.answer()
+    editor_id = _parse_callback_int(data, prefix="provision:addeditor:confirm:")
+    if editor_id is not None:
+        await safe_answer(query)
         await add_editor_confirm_callback(update, context, editor_id)
         return
 
     if data == "provision:addeditor:cancel":
-        await query.answer()
+        await safe_answer(query)
         await add_editor_cancel_callback(update, context)
         return
 
-    if data.startswith("approval:preview:"):
-        queue_id = int(data.split(":")[-1])
-        await query.answer()
+    queue_id = _parse_callback_int(data, prefix="approval:preview:")
+    if queue_id is not None:
+        await safe_answer(query)
         await approval_preview_callback(update, context, queue_id)
         return
 
-    if data.startswith("approval:approve_now:"):
-        queue_id = int(data.split(":")[-1])
-        await query.answer()
+    queue_id = _parse_callback_int(data, prefix="approval:approve_now:")
+    if queue_id is not None:
+        await safe_answer(query)
         await approval_approve_now_callback(update, context, queue_id)
         return
 
-    if data.startswith("approval:approve_schedule:"):
-        queue_id = int(data.split(":")[-1])
-        await query.answer()
+    queue_id = _parse_callback_int(data, prefix="approval:approve_schedule:")
+    if queue_id is not None:
+        await safe_answer(query)
         await approval_approve_schedule_callback(update, context, queue_id)
         return
 
-    if data.startswith("approval:reject:"):
-        queue_id = int(data.split(":")[-1])
-        await query.answer()
+    queue_id = _parse_callback_int(data, prefix="approval:reject:")
+    if queue_id is not None:
+        await safe_answer(query)
         await approval_reject_callback(update, context, queue_id)
         return
 
-    if data.startswith("approval:edit:"):
-        queue_id = int(data.split(":")[-1])
-        await query.answer()
+    queue_id = _parse_callback_int(data, prefix="approval:edit:")
+    if queue_id is not None:
+        await safe_answer(query)
         await approval_edit_callback(update, context, queue_id)
         return
 
-    if data.startswith("workspace:switch:"):
-        workspace_id = int(data.split(":")[-1])
-        await query.answer()
+    workspace_id = _parse_callback_int(data, prefix="workspace:switch:")
+    if workspace_id is not None:
+        await safe_answer(query)
         await workspace_switch_callback(update, context, workspace_id)
         return
 
-    if data.startswith("workspace:delete_yes:"):
-        workspace_id = int(data.split(":")[-1])
-        await query.answer()
+    workspace_id = _parse_callback_int(data, prefix="workspace:delete_yes:")
+    if workspace_id is not None:
+        await safe_answer(query)
         await workspace_delete_yes_callback(update, context, workspace_id)
         return
 
     if data == "workspace:delete_no":
-        await query.answer()
+        await safe_answer(query)
         await workspace_delete_no_callback(update, context)
         return
 
-    if data.startswith("collection:delete_yes:"):
-        collection_id = int(data.split(":")[-1])
-        await query.answer()
+    collection_id = _parse_callback_int(data, prefix="collection:delete_yes:")
+    if collection_id is not None:
+        await safe_answer(query)
         await collection_delete_yes_callback(update, context, collection_id)
         return
 
     if data == "collection:delete_no":
-        await query.answer()
+        await safe_answer(query)
         await collection_delete_no_callback(update, context)
         return
 
     if data == "post:dashboard":
-        await query.answer()
+        await safe_answer(query)
         await post_dashboard(update, context)
         return
 
     if data == "post:text":
-        await query.answer()
+        await safe_answer(query)
         await text_post(update, context)
         return
 
     if data == "post:photo":
-        await query.answer()
+        await safe_answer(query)
         await photo_post(update, context)
         return
 
     if data == "post:gif":
-        await query.answer()
+        await safe_answer(query)
         await gif_post(update, context)
         return
 
     if data == "post:video":
-        await query.answer()
+        await safe_answer(query)
         await video_post(update, context)
         return
 
     if data == "post:document":
-        await query.answer()
+        await safe_answer(query)
         await document_post(update, context)
         return
 
     if data == "post:album":
-        await query.answer()
+        await safe_answer(query)
         await album_post(update, context)
         return
 
     if data == "post:preview":
-        await query.answer()
+        await safe_answer(query)
         await preview_post(update, context)
         return
 
     if data == "post:publish":
-        await query.answer()
+        await safe_answer(query)
         await publish_post(update, context)
         return
 
     if data == "post:delete":
-        await query.answer()
+        await safe_answer(query)
         await delete_draft(update, context)
         return
 
     if data == "post:edit":
-        await query.answer()
+        await safe_answer(query)
         await edit_draft(update, context)
         return
 
-    if data.startswith("post:channel:"):
-        channel_id = int(data.split(":", 2)[-1])
-        await query.answer()
+    channel_id = _parse_callback_int(data, prefix="post:channel:")
+    if channel_id is not None:
+        await safe_answer(query)
         await publish_to_channel(update, context, channel_id)
         return
 
     if data == "channel:dashboard":
-        await query.answer()
+        await safe_answer(query)
         await channel_dashboard(update, context)
         return
 
     if data == "channel:add":
-        await query.answer()
+        await safe_answer(query)
         await add_channel_menu(update, context)
         return
 
     if data == "channel:list":
-        await query.answer()
+        await safe_answer(query)
         await list_channels(update, context)
         return
 
     if data == "channel:default_menu":
-        await query.answer()
+        await safe_answer(query)
         await default_channel_menu(update, context)
         return
 
     if data == "channel:remove_menu":
-        await query.answer()
+        await safe_answer(query)
         await remove_channel_menu(update, context)
         return
 
     if data == "channel:refresh":
-        await query.answer()
+        await safe_answer(query)
         await channel_dashboard(update, context)
         return
 
-    if data.startswith("channel:set_default:"):
-        channel_id = int(data.split(":", 2)[-1])
-        await query.answer()
+    channel_id = _parse_callback_int(data, prefix="channel:set_default:")
+    if channel_id is not None:
+        await safe_answer(query)
         await set_default_channel(update, context, channel_id)
         return
 
-    if data.startswith("channel:remove_confirm:"):
-        channel_id = int(data.split(":", 2)[-1])
-        await query.answer()
+    channel_id = _parse_callback_int(data, prefix="channel:remove_confirm:")
+    if channel_id is not None:
+        await safe_answer(query)
         await remove_channel_confirm(update, context, channel_id)
         return
 
-    if data.startswith("channel:remove_yes:"):
-        channel_id = int(data.split(":", 2)[-1])
-        await query.answer()
+    channel_id = _parse_callback_int(data, prefix="channel:remove_yes:")
+    if channel_id is not None:
+        await safe_answer(query)
         await remove_channel_confirm(update, context, channel_id, confirmed=True)
         return
 
     if data == "scheduler:schedule":
-        await query.answer()
+        await safe_answer(query)
         await schedule_post(update, context)
         return
 
     if data == "scheduler:list":
-        await query.answer()
+        await safe_answer(query)
         await list_schedules(update, context)
         return
 
     if data.startswith("scheduler:pause:"):
-        await query.answer()
+        await safe_answer(query)
         await pause_schedule(update, context)
         return
 
     if data.startswith("scheduler:resume:"):
-        await query.answer()
+        await safe_answer(query)
         await resume_schedule(update, context)
         return
 
     if data.startswith("scheduler:edit:"):
-        await query.answer()
+        await safe_answer(query)
         await edit_schedule(update, context)
         return
 
     if data.startswith("scheduler:delete:"):
-        await query.answer()
+        await safe_answer(query)
         await delete_schedule(update, context)
         return
 
-    await query.answer("Unsupported action.")
+    await safe_answer(query, "Unsupported action.")

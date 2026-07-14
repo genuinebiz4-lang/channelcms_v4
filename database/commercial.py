@@ -310,11 +310,27 @@ async def verify_tron_payment(tx_hash: str, expected_amount: float, receiver_wal
             response = await client.get(url, headers=headers)
             if response.status_code >= 400:
                 return False, f"TRON API returned {response.status_code}", {}
-            payload = response.json() if response.content else {}
+            if not response.content:
+                return False, "TRON API returned empty response.", {}
+            try:
+                payload = response.json()
+            except ValueError:
+                return False, "TRON API returned invalid JSON response.", {}
+    except httpx.TimeoutException:
+        return False, "TRON API request timeout.", {}
+    except httpx.NetworkError as exc:
+        return False, f"TRON API network failure: {exc}", {}
+    except httpx.HTTPError as exc:
+        return False, f"TRON API HTTP error: {exc}", {}
     except Exception as exc:
         return False, f"TRON API request failed: {exc}", {}
 
+    if not isinstance(payload, dict):
+        return False, "TRON API returned unexpected response format.", {}
+
     data = payload.get("data") or []
+    if not isinstance(data, list):
+        return False, "TRON API response missing event list.", payload
     transfer = None
     for event in data:
         candidate = _parse_tron_transfer(event)

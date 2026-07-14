@@ -37,6 +37,7 @@ from states import (
 )
 from utils.logger import get_logger
 from utils.permissions import can_compose_content, can_publish_content
+from utils.telegram_safety import duplicate_guard, safe_answer, safe_edit_message
 
 logger = get_logger(__name__)
 
@@ -45,8 +46,8 @@ async def _send_or_edit(update: Update, text: str, keyboard=None, answer_text: s
     """Reply to a normal message or edit a callback message."""
     query = update.callback_query
     if query is not None:
-        await query.answer(answer_text or "")
-        await query.edit_message_text(text, reply_markup=keyboard)
+        await safe_answer(query, answer_text)
+        await safe_edit_message(query, text, reply_markup=keyboard)
         return
 
     if update.effective_message is not None:
@@ -463,6 +464,13 @@ async def publish_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await _send_or_edit(update, "❌ No draft available to publish.", keyboard=build_post_keyboard())
         return
 
+    actor_id = int(update.effective_user.id) if update.effective_user else 0
+    draft_id = int(draft.get("id") or 0)
+    dedupe_key = f"publish:{actor_id}:{draft_id}:{int(channel_id)}"
+    if duplicate_guard(context.application.bot_data, dedupe_key, ttl_seconds=8):
+        await _send_or_edit(update, "ℹ Publish already in progress or just completed.", keyboard=build_post_keyboard())
+        return
+
     try:
         if draft.get("draft_type") == "text":
             await context.bot.send_message(
@@ -532,12 +540,12 @@ async def publish_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE,
             channel_id=int(channel_id),
             workspace_id=None,
             collection_id=None,
-            editor_id=int(update.effective_user.id) if update.effective_user else None,
+            editor_id=actor_id or None,
             published_via="manual",
             status="published",
         )
         await log_audit(
-            actor_id=int(update.effective_user.id) if update.effective_user else None,
+            actor_id=actor_id or None,
             actor_role="publisher",
             action="publish_success",
             module="post",
@@ -564,7 +572,7 @@ async def publish_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE,
             channel_id=int(channel_id),
             workspace_id=None,
             collection_id=None,
-            editor_id=int(update.effective_user.id) if update.effective_user else None,
+            editor_id=actor_id or None,
             published_via="manual",
             status="failed",
             error_message=str(exc),

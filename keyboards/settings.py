@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
+@lru_cache(maxsize=4)
 def build_settings_keyboard(approval_required: bool, can_toggle: bool) -> InlineKeyboardMarkup:
 	"""Build the settings action keyboard."""
 	status_label = "ON" if approval_required else "OFF"

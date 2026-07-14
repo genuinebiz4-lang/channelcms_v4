@@ -47,6 +47,7 @@ from keyboards.workspace import (
 from states import WAITING_MEDIA_UPLOAD
 from utils.logger import get_logger
 from utils.permissions import ROLE_ADMIN, ROLE_EDITOR, can_publish_content, get_request_role, is_owner
+from utils.telegram_safety import safe_edit_message
 
 logger = get_logger(__name__)
 
@@ -56,7 +57,8 @@ async def workspace_dashboard_callback(update: Update, context: ContextTypes.DEF
     query = update.callback_query
     if query is None:
         return
-    await query.edit_message_text(
+    await safe_edit_message(
+        query,
         "🧭 Workspace Manager\n\n"
         "Use commands:\n"
         "/createworkspace\n"
@@ -378,7 +380,7 @@ async def workspace_switch_callback(update: Update, context: ContextTypes.DEFAUL
         await query.answer("Switch failed", show_alert=True)
         return
 
-    await query.edit_message_text(f"✅ Switched to workspace: {ws['workspace_name']}")
+    await safe_edit_message(query, f"✅ Switched to workspace: {ws['workspace_name']}")
 
 
 async def workspace_delete_yes_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, workspace_id: int) -> None:
@@ -404,12 +406,12 @@ async def workspace_delete_yes_callback(update: Update, context: ContextTypes.DE
 
     ok = await soft_delete_workspace(workspace_id)
     if not ok:
-        await query.edit_message_text("Workspace deletion failed.")
+        await safe_edit_message(query, "Workspace deletion failed.")
         return
 
     await audit_action(int(update.effective_user.id), "workspace_deleted", admin_id, {"workspace_id": workspace_id})
     logger.info("Workspace deleted: admin=%s workspace=%s", admin_id, workspace_id)
-    await query.edit_message_text("🗑 Workspace deleted.")
+    await safe_edit_message(query, "🗑 Workspace deleted.")
 
 
 async def workspace_delete_no_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -417,7 +419,7 @@ async def workspace_delete_no_callback(update: Update, context: ContextTypes.DEF
     query = update.callback_query
     if query is None:
         return
-    await query.edit_message_text("Workspace deletion cancelled.")
+    await safe_edit_message(query, "Workspace deletion cancelled.")
 
 
 async def create_collection_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -578,12 +580,12 @@ async def collection_delete_yes_callback(update: Update, context: ContextTypes.D
 
     ok = await soft_delete_collection(admin_id, collection_id)
     if not ok:
-        await query.edit_message_text("Collection not found in your scope.")
+        await safe_edit_message(query, "Collection not found in your scope.")
         return
 
     await audit_action(int(update.effective_user.id), "collection_deleted", admin_id, {"collection_id": collection_id})
     logger.info("Collection deleted: admin=%s collection=%s", admin_id, collection_id)
-    await query.edit_message_text("🗑 Collection deleted.")
+    await safe_edit_message(query, "🗑 Collection deleted.")
 
 
 async def collection_delete_no_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -591,7 +593,7 @@ async def collection_delete_no_callback(update: Update, context: ContextTypes.DE
     query = update.callback_query
     if query is None:
         return
-    await query.edit_message_text("Collection deletion cancelled.")
+    await safe_edit_message(query, "Collection deletion cancelled.")
 
 
 async def media_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

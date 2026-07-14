@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
+@lru_cache(maxsize=1)
 def build_scheduler_keyboard() -> InlineKeyboardMarkup:
     """Create the main scheduler keyboard."""
     buttons = [

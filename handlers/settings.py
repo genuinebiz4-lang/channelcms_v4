@@ -8,14 +8,15 @@ from telegram.ext import ContextTypes
 from database.settings import get_admin_for_user, is_approval_required, set_approval_required
 from keyboards.settings import build_settings_keyboard
 from utils.permissions import ROLE_ADMIN, get_request_role
+from utils.telegram_safety import safe_answer, safe_edit_message
 
 
 async def _send_or_edit(update: Update, text: str, keyboard=None, answer_text: str | None = None) -> None:
 	"""Reply to a normal message or edit a callback message."""
 	query = update.callback_query
 	if query is not None:
-		await query.answer(answer_text or "")
-		await query.edit_message_text(text, reply_markup=keyboard)
+		await safe_answer(query, answer_text)
+		await safe_edit_message(query, text, reply_markup=keyboard)
 		return
 
 	if update.effective_message is not None:

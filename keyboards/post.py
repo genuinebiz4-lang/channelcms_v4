@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
+@lru_cache(maxsize=1)
 def build_post_keyboard() -> InlineKeyboardMarkup:
     """Create the main post composer keyboard."""
     buttons = [
@@ -32,6 +35,7 @@ def build_publish_keyboard(channel_ids: list[int]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
+@lru_cache(maxsize=1)
 def build_preview_keyboard() -> InlineKeyboardMarkup:
     """Create a preview action keyboard."""
     buttons = [

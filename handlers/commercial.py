@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import os
 import shutil
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from telegram import Update
+from telegram import error as telegram_error
+from telegram.error import BadRequest, Conflict, Forbidden, NetworkError, RetryAfter, TimedOut
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from config import BASE_DIR, OWNER_ID, TIMEZONE, TRON_API_KEY, USDT_TRC20_WALLET
@@ -36,8 +39,10 @@ from database.settings import get_admin_for_user
 from utils.logger import get_logger
 from utils.permissions import ROLE_ADMIN, get_request_role, is_owner
 from utils.rate_limit import enforce_rate_limit
+from utils.telegram_safety import is_not_modified_error, retry_transient, safe_edit_message
 
 logger = get_logger(__name__)
+UnauthorizedType = getattr(telegram_error, "Unauthorized", Forbidden)
 
 
 def _utc_now() -> datetime:
@@ -485,7 +490,8 @@ async def owner_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     if query is None:
         return
-    await query.edit_message_text(
+    await safe_edit_message(
+        query,
         "👑 Owner Menu\n\n"
         "System: /system /health /database /maintenance\n"
         "Payments: /revenue /payments /paymentstats\n"
@@ -500,7 +506,8 @@ async def admin_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     if query is None:
         return
-    await query.edit_message_text(
+    await safe_edit_message(
+        query,
         "🧑‍💼 Admin Menu\n\n"
         "Workspace: /workspaces /switchworkspace\n"
         "Destinations: /channels /addchannel\n"
@@ -516,7 +523,8 @@ async def editor_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     if query is None:
         return
-    await query.edit_message_text(
+    await safe_edit_message(
+        query,
         "✍ Editor Menu\n\n"
         "Drafts: /postdashboard\n"
         "Assigned Destinations: /collections\n"
@@ -588,19 +596,60 @@ async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYP
     exc = context.error
     source = "telegram_update"
     message = str(exc) if exc else "Unknown exception"
+    error_uid = f"ERR-{uuid.uuid4().hex[:12].upper()}"
 
-    report = await report_error(source=source, message=message, exc=exc, context={"update": str(update)[:400]})
-    error_uid = report.get("error_uid") or "ERR-unknown"
+    if exc is None:
+        logger.debug("global_error_handler invoked without exception")
+        return
 
-    logger.exception("Unhandled exception captured %s", error_uid)
+    if isinstance(exc, BadRequest):
+        if is_not_modified_error(exc):
+            logger.debug("Ignored harmless Telegram BadRequest (%s): %s", error_uid, message)
+            return
+        logger.info("Telegram BadRequest (%s): %s", error_uid, message)
+        return
+
+    if isinstance(exc, Forbidden):
+        logger.info("Telegram Forbidden (%s): %s", error_uid, message)
+        return
+
+    if isinstance(exc, UnauthorizedType):
+        logger.info("Telegram Unauthorized (%s): %s", error_uid, message)
+        return
+
+    if isinstance(exc, RetryAfter):
+        wait_seconds = int(getattr(exc, "retry_after", 1) or 1)
+        logger.info("Telegram RetryAfter (%s): wait=%ss", error_uid, wait_seconds)
+        return
+
+    if isinstance(exc, TimedOut):
+        logger.info("Telegram TimedOut (%s): %s", error_uid, message)
+        return
+
+    if isinstance(exc, NetworkError):
+        logger.info("Telegram NetworkError (%s): %s", error_uid, message)
+        return
+
+    if isinstance(exc, Conflict):
+        logger.warning("Telegram Conflict (%s): %s", error_uid, message)
+        return
+
+    report = await report_error(source=source, message=message, exc=exc, context={"update": str(update)[:400], "error_uid": error_uid})
+    persisted_uid = report.get("error_uid") or error_uid
+
+    logger.exception("Unhandled exception captured %s", persisted_uid)
     if OWNER_ID:
         try:
-            await context.bot.send_message(
-                chat_id=int(OWNER_ID),
-                text=f"🚨 Flowza error captured: {error_uid}\nSource: {source}\nMessage: {message[:200]}",
+            await retry_transient(
+                lambda: context.bot.send_message(
+                    chat_id=int(OWNER_ID),
+                    text=f"🚨 Flowza error captured: {persisted_uid}\nSource: {source}\nMessage: {message[:200]}",
+                ),
+                attempts=3,
+                delay_seconds=0.6,
             )
         except Exception:
-            logger.warning("Failed to notify owner for error %s", error_uid)
+            logger.warning("Failed to notify owner for error %s", persisted_uid)
 
 
 def register_commercial_handlers(application: Application) -> None:

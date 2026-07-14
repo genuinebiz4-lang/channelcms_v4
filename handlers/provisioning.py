@@ -35,6 +35,7 @@ from keyboards.provisioning import build_add_admin_confirmation_keyboard, build_
 from states import WAITING_ADMIN_FORWARD, WAITING_EDITOR_DESTINATIONS, WAITING_EDITOR_FORWARD, WAITING_EDITOR_WORKSPACE
 from utils.logger import get_logger
 from utils.permissions import ROLE_ADMIN, ROLE_EDITOR, get_request_role, is_owner
+from utils.telegram_safety import safe_edit_message
 
 logger = get_logger(__name__)
 
@@ -158,7 +159,7 @@ async def add_admin_confirm_callback(update: Update, context: ContextTypes.DEFAU
         actor_id=actor_id,
     )
     if not ok:
-        await query.edit_message_text(f"❌ {message}")
+        await safe_edit_message(query, f"❌ {message}")
         context.user_data.pop("pending_admin", None)
         context.user_data.pop("provision_state", None)
         return
@@ -172,7 +173,8 @@ async def add_admin_confirm_callback(update: Update, context: ContextTypes.DEFAU
         "🎉 You have been onboarded as an Admin in Flowza v1.0. Use /start to open your dashboard.",
     )
 
-    await query.edit_message_text(
+    await safe_edit_message(
+        query,
         "✅ Admin profile created successfully.\n\n"
         f"Admin ID: {admin_id}\n"
         f"Status: {profile.get('status')}\n"
@@ -189,7 +191,7 @@ async def add_admin_cancel_callback(update: Update, context: ContextTypes.DEFAUL
         return
     context.user_data.pop("pending_admin", None)
     context.user_data.pop("provision_state", None)
-    await query.edit_message_text("Admin onboarding cancelled.")
+    await safe_edit_message(query, "Admin onboarding cancelled.")
 
 
 async def list_admins_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -476,7 +478,7 @@ async def add_editor_confirm_callback(update: Update, context: ContextTypes.DEFA
     )
 
     if not ok:
-        await query.edit_message_text(f"❌ {message}")
+        await safe_edit_message(query, f"❌ {message}")
         context.user_data.pop("pending_editor", None)
         context.user_data.pop("provision_state", None)
         return
@@ -507,7 +509,7 @@ async def add_editor_confirm_callback(update: Update, context: ContextTypes.DEFA
             f"Editor created: {editor_id} under admin {pending.get('admin_id')}",
         )
 
-    await query.edit_message_text("✅ Editor created successfully.")
+    await safe_edit_message(query, "✅ Editor created successfully.")
     context.user_data.pop("pending_editor", None)
     context.user_data.pop("provision_state", None)
 
@@ -519,7 +521,7 @@ async def add_editor_cancel_callback(update: Update, context: ContextTypes.DEFAU
         return
     context.user_data.pop("pending_editor", None)
     context.user_data.pop("provision_state", None)
-    await query.edit_message_text("Editor onboarding cancelled.")
+    await safe_edit_message(query, "Editor onboarding cancelled.")
 
 
 async def list_editors_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -24,6 +24,7 @@ from keyboards.approval import build_admin_approval_actions
 from states import WAITING_APPROVAL_REJECT_REASON
 from utils.logger import get_logger
 from utils.permissions import ROLE_ADMIN, ROLE_EDITOR, get_request_role, is_owner
+from utils.telegram_safety import safe_edit_message
 
 logger = get_logger(__name__)
 
@@ -153,7 +154,7 @@ async def approval_preview_callback(update: Update, context: ContextTypes.DEFAUL
 
     draft = await get_draft(int(item["draft_id"]))
     if draft is None:
-        await query.edit_message_text("❌ Draft not found (possibly deleted).")
+        await safe_edit_message(query, "❌ Draft not found (possibly deleted).")
         return
 
     text = (
@@ -170,7 +171,7 @@ async def approval_preview_callback(update: Update, context: ContextTypes.DEFAUL
     if draft.get("caption"):
         text += f"\n\nCaption:\n{draft['caption']}"
 
-    await query.edit_message_text(text, reply_markup=build_admin_approval_actions(queue_id))
+    await safe_edit_message(query, text, reply_markup=build_admin_approval_actions(queue_id))
 
 
 async def approval_approve_now_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, queue_id: int) -> None:
@@ -201,12 +202,12 @@ async def approval_approve_now_callback(update: Update, context: ContextTypes.DE
     draft = await get_draft(int(item["draft_id"]))
     if draft is None:
         await set_status(queue_id, status="cancelled")
-        await query.edit_message_text("❌ Draft was deleted. Approval cancelled.")
+        await safe_edit_message(query, "❌ Draft was deleted. Approval cancelled.")
         return
 
     destination = item.get("destination_id")
     if not destination:
-        await query.edit_message_text("❌ Destination is not assigned for this queue item.")
+        await safe_edit_message(query, "❌ Destination is not assigned for this queue item.")
         return
 
     await set_status(queue_id, status="approved", approved_by=int(update.effective_user.id))
@@ -252,14 +253,15 @@ async def approval_approve_schedule_callback(update: Update, context: ContextTyp
     draft = await get_draft(int(item["draft_id"]))
     if draft is None:
         await set_status(queue_id, status="cancelled")
-        await query.edit_message_text("❌ Draft was deleted. Approval cancelled.")
+        await safe_edit_message(query, "❌ Draft was deleted. Approval cancelled.")
         return
 
     await set_status(queue_id, status="approved", approved_by=int(update.effective_user.id))
     await audit_action(int(update.effective_user.id), "approval_approved_for_schedule", item["editor_id"], {"queue_id": queue_id})
     logger.info("Approval approved for scheduling: queue=%s", queue_id)
 
-    await query.edit_message_text(
+    await safe_edit_message(
+        query,
         f"✅ Queue #{queue_id} approved for scheduling. Use Scheduler module to set run time.",
         reply_markup=build_admin_approval_actions(queue_id),
     )
@@ -293,7 +295,7 @@ async def approval_reject_callback(update: Update, context: ContextTypes.DEFAULT
 
     context.user_data["approval_reject_queue_id"] = queue_id
     context.user_data["approval_state"] = WAITING_APPROVAL_REJECT_REASON
-    await query.edit_message_text(f"Send rejection reason for Queue #{queue_id}.")
+    await safe_edit_message(query, f"Send rejection reason for Queue #{queue_id}.")
 
 
 async def approval_reject_reason_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -369,7 +371,7 @@ async def approval_edit_callback(update: Update, context: ContextTypes.DEFAULT_T
         await query.answer("You cannot edit this queue item", show_alert=True)
         return
 
-    await query.edit_message_text(f"✏ Editor notified to revise draft for Queue #{queue_id}.")
+    await safe_edit_message(query, f"✏ Editor notified to revise draft for Queue #{queue_id}.")
     try:
         await context.bot.send_message(
             chat_id=int(item["editor_id"]),

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
+@lru_cache(maxsize=1)
 def build_channel_manager_keyboard() -> InlineKeyboardMarkup:
     """Create the main destination management keyboard."""
     buttons = [

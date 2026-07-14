@@ -25,6 +25,7 @@ from keyboards.channel import (
 from states import WAITING_CHANNEL_FORWARD
 from utils.logger import get_logger
 from utils.permissions import can_manage_destinations
+from utils.telegram_safety import safe_answer, safe_edit_message
 
 logger = get_logger(__name__)
 
@@ -38,8 +39,8 @@ async def _send_or_edit(
     """Reply to a normal message or edit a callback message."""
     query = update.callback_query
     if query is not None:
-        await query.answer(answer_text or "")
-        await query.edit_message_text(text, reply_markup=keyboard)
+        await safe_answer(query, answer_text)
+        await safe_edit_message(query, text, reply_markup=keyboard)
         return
 
     if update.effective_message is not None:

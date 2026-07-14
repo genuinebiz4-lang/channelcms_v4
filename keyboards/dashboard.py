@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
+@lru_cache(maxsize=1)
 def build_dashboard_keyboard() -> InlineKeyboardMarkup:
     """Create the startup dashboard keyboard."""
     buttons = [
@@ -17,6 +20,7 @@ def build_dashboard_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
+@lru_cache(maxsize=1)
 def build_owner_dashboard_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton("🖥 System", callback_data="dashboard:owner_system")],
@@ -28,6 +32,7 @@ def build_owner_dashboard_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
+@lru_cache(maxsize=1)
 def build_admin_dashboard_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton("🧭 Workspace", callback_data="dashboard:workspaces")],
@@ -40,6 +45,7 @@ def build_admin_dashboard_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
+@lru_cache(maxsize=1)
 def build_editor_dashboard_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton("📝 Drafts", callback_data="dashboard:posts")],

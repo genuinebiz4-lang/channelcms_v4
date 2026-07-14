@@ -167,6 +167,37 @@ async def get_pending() -> list[dict[str, Any]]:
     return await asyncio.to_thread(_get_pending)
 
 
+async def find_duplicate_schedule(
+    *,
+    draft_id: int,
+    channel_id: int,
+    schedule_type: str,
+    schedule_date: str | None,
+    schedule_time: str | None,
+) -> dict[str, Any] | None:
+    """Return an existing active/pending schedule matching the same payload."""
+
+    def _find() -> dict[str, Any] | None:
+        with get_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM scheduled_posts
+                WHERE draft_id = ?
+                  AND channel_id = ?
+                  AND schedule_type = ?
+                  AND COALESCE(schedule_date, '') = COALESCE(?, '')
+                  AND COALESCE(schedule_time, '') = COALESCE(?, '')
+                  AND status IN ('pending', 'active', 'paused')
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (draft_id, channel_id, schedule_type, schedule_date, schedule_time),
+            ).fetchone()
+            return None if row is None else _row_to_dict(row)
+
+    return await asyncio.to_thread(_find)
+
+
 async def mark_completed(schedule_id: int) -> bool:
     """Mark a schedule as completed."""
     return await update_schedule(schedule_id, status="completed", last_run="now")

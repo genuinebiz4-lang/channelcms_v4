@@ -32,6 +32,7 @@ from database.enterprise import (
 from database.scheduler import (
     add_schedule,
     delete_schedule as delete_schedule_db,
+    find_duplicate_schedule,
     get_all_schedules,
     get_pending,
     get_schedule,
@@ -52,6 +53,7 @@ from states import (
 )
 from utils.logger import get_logger
 from utils.permissions import can_manage_schedule
+from utils.telegram_safety import safe_answer, safe_edit_message
 
 logger = get_logger(__name__)
 
@@ -63,8 +65,8 @@ async def _send_or_edit(update: Update, text: str, keyboard=None, answer_text: s
     """Reply to a normal message or edit a callback message."""
     query = update.callback_query
     if query is not None:
-        await query.answer(answer_text or "")
-        await query.edit_message_text(text, reply_markup=keyboard)
+        await safe_answer(query, answer_text)
+        await safe_edit_message(query, text, reply_markup=keyboard)
         return
 
     if update.effective_message is not None:
@@ -315,6 +317,21 @@ async def confirm_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if ws is not None:
             workspace_id = int(ws["workspace_id"])
             timezone_name = await get_workspace_timezone(workspace_id, TIMEZONE)
+
+    duplicate = await find_duplicate_schedule(
+        draft_id=int(draft_id),
+        channel_id=int(channel_id),
+        schedule_type=schedule_type,
+        schedule_date=schedule_date,
+        schedule_time=schedule_time,
+    )
+    if duplicate is not None:
+        await message.reply_text(
+            f"ℹ Duplicate schedule prevented. Existing schedule ID: {duplicate['id']}",
+            reply_markup=build_scheduler_keyboard(),
+        )
+        context.user_data.pop("post_state", None)
+        return
 
     schedule = await add_schedule(
         draft_id=int(draft_id),

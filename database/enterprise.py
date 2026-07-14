@@ -300,6 +300,22 @@ async def enqueue_retry(
 
     def _enqueue() -> dict[str, Any] | None:
         with get_connection() as connection:
+            existing = connection.execute(
+                """
+                SELECT * FROM retry_queue
+                WHERE COALESCE(schedule_id, -1) = COALESCE(?, -1)
+                  AND COALESCE(draft_id, -1) = COALESCE(?, -1)
+                  AND COALESCE(channel_id, -1) = COALESCE(?, -1)
+                  AND retry_reason = ?
+                  AND status IN ('queued', 'processing')
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (schedule_id, draft_id, channel_id, retry_reason),
+            ).fetchone()
+            if existing is not None:
+                return _row_to_dict(existing)
+
             cursor = connection.execute(
                 """
                 INSERT INTO retry_queue(
