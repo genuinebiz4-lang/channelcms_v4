@@ -1,7 +1,7 @@
 # DATABASE
 
 Product: Flowza v1.0  
-Version: Flowza v1.0.2
+Version: Flowza v1.0.3
 
 ## Engine
 
@@ -84,7 +84,24 @@ Version: Flowza v1.0.2
 25. central_audit_log
 - Purpose: centralized cross-module audit trail.
 
+26. subscription_plans
+- Purpose: authoritative commercial plan definitions and pricing.
+
+27. admin_subscriptions
+- Purpose: per-admin subscription timeline, status, and expiry snapshots.
+
+28. payment_requests
+- Purpose: payment request lifecycle records awaiting verification.
+
+29. payment_history
+- Purpose: immutable ledger of verified USDT TRC20 payments.
+
+30. system_backups
+- Purpose: metadata for manual and scheduled backup archives.
+
+31. error_reports
+- Purpose: persistent capture of unhandled runtime failures and diagnostic context.
+
 ## Planned Tables
 
-- payment/subscription records
 - recycle bin metadata

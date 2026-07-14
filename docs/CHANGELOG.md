@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## Flowza v1.0.3 - 2026-07-15
+
+### Added
+
+- Commercial persistence layer for subscription plans, admin subscriptions, payment requests, payment history, backup metadata, and error reports
+- Telegram commercial command surface for plans, subscription status, renewal, payment submission, owner revenue dashboards, system health, backups, and error review
+- USDT TRC20 payment verification pipeline using transaction hash checks against TronGrid events API
+- Daily commercial scheduler sweep for subscription expiry state sync and proactive renewal reminders
+- Automated daily and weekly backup jobs integrated into scheduler lifecycle
+- Global error handler with persistent error UID capture and owner alert notifications
+- Milestone 9 integration test scaffold for subscription lifecycle, payments, backups, and error persistence
+
+### Changed
+
+- Permission checks for publishing and scheduling now require active subscription state for admin/editor scopes
+- Startup initialization now includes commercial schema and commercial command handlers
+- Dashboard and callback routing now expose role-specific owner/admin/editor operational menus
+- Documentation and release metadata bumped to v1.0.3
+
+### Planned
+
+- Destination type expansion (groups/supergroups/topics)
+- Restore workflows for backup archives and recycle bin support
+
 ## Flowza v1.0.2 - 2026-07-15
 
 ### Added

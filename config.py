@@ -13,7 +13,7 @@ load_dotenv(ENV_PATH)
 
 APP_NAME = "Flowza"
 APP_TITLE = "Flowza v1.0"
-VERSION = "Flowza v1.0.2"
+VERSION = "Flowza v1.0.3"
 
 
 def _get_int_env(name: str, default: int = 0) -> int:
@@ -32,6 +32,8 @@ OWNER_ID = _get_int_env("OWNER_ID", 0)
 DATABASE = os.getenv("DATABASE", "database/data/channelcms.db").strip()
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 TIMEZONE = os.getenv("TIMEZONE", "Asia/Kolkata").strip()
+USDT_TRC20_WALLET = os.getenv("USDT_TRC20_WALLET", "").strip()
+TRON_API_KEY = os.getenv("TRON_API_KEY", "").strip()
 
 
 def get_database_path() -> str:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import unittest
 
 from database.enterprise import (
@@ -28,12 +29,15 @@ class Milestone8IntegrationTests(unittest.TestCase):
             await initialize_workspace()
             await initialize_enterprise()
 
-            ok, _msg, workspace = await create_workspace(999001, "Test WS", "integration")
+            admin_id = 990000 + int(time.time() % 10000)
+            workspace_name = f"Test WS {int(time.time() * 1000)}"
+
+            ok, _msg, workspace = await create_workspace(admin_id, workspace_name, "integration")
             self.assertTrue(ok)
             self.assertIsNotNone(workspace)
             workspace_id = int(workspace["workspace_id"])
 
-            ok, _msg, collection = await create_collection(999001, workspace_id, "Launch Collection", "test")
+            ok, _msg, collection = await create_collection(admin_id, workspace_id, "Launch Collection", "test")
             self.assertTrue(ok)
             self.assertIsNotNone(collection)
 
@@ -43,26 +47,26 @@ class Milestone8IntegrationTests(unittest.TestCase):
                 file_type="photo",
                 caption="integration caption",
                 tags="integration,test",
-                created_by=999001,
+                created_by=admin_id,
             )
             self.assertTrue(ok)
             self.assertIsNotNone(media)
 
             ok, _msg, template = await create_template(
                 workspace_id=workspace_id,
-                admin_id=999001,
+                admin_id=admin_id,
                 template_name="Launch Template",
                 body_text="Hello {workspace}",
                 media_file_id=None,
                 buttons=None,
-                created_by=999001,
+                created_by=admin_id,
                 variables={"workspace": ""},
             )
             self.assertTrue(ok)
             self.assertIsNotNone(template)
 
-            await create_notification(999001, "admin", "integration", "Integration Test", "Notification row")
-            notifications = await list_notifications(999001)
+            await create_notification(admin_id, "admin", "integration", "Integration Test", "Notification row")
+            notifications = await list_notifications(admin_id)
             self.assertGreaterEqual(len(notifications), 1)
 
             owner_snapshot = await analytics_snapshot("owner")

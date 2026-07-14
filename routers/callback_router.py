@@ -43,6 +43,7 @@ from handlers.workspace import (
     workspace_delete_yes_callback,
     workspace_switch_callback,
 )
+from handlers.commercial import admin_menu_callback, editor_menu_callback, owner_menu_callback
 from handlers.provisioning import (
     add_admin_cancel_callback,
     add_admin_confirm_callback,
@@ -94,6 +95,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if data == "dashboard:settings":
         await query.answer()
         await settings_dashboard(update, context)
+        return
+
+    if data in {"dashboard:owner_system", "dashboard:owner_payments", "dashboard:owner_users", "dashboard:owner_health", "dashboard:owner_backup"}:
+        await query.answer()
+        await owner_menu_callback(update, context)
+        return
+
+    if data in {"dashboard:admin_analytics", "dashboard:admin_subscription"}:
+        await query.answer()
+        await admin_menu_callback(update, context)
+        return
+
+    if data == "dashboard:editor_approval":
+        await query.answer()
+        await editor_menu_callback(update, context)
         return
 
     if data == "settings:dashboard":

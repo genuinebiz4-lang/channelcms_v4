@@ -6,7 +6,7 @@ Automate.
 Schedule.  
 Grow.
 
-Version: Flowza v1.0.2
+Version: Flowza v1.0.3
 
 ## About
 
@@ -42,20 +42,19 @@ Target users:
 - ✔ Notification Center (owner/admin/editor notifications with read state)
 - ✔ Central Audit Log (cross-module action history)
 - ✔ Performance Layer (SQLite WAL mode, maintenance cleanup, vacuum command)
+- ✔ Commercial Engine (subscription lifecycle, plan management, payment requests)
+- ✔ USDT TRC20 Verification (transaction hash verification via TronGrid)
+- ✔ Owner Revenue and Subscription Operations (health, revenue, payments, expiry dashboards)
+- ✔ Automated Backup Jobs (daily/weekly zip backups plus manual backup command)
+- ✔ Global Error Reporting (error UID capture and owner alerting)
 - ✔ Settings Dashboard (role and approval status)
 - ✔ Structured Logging
 - ✔ SQLite Database Layer
 - ✔ Telegram Dashboard Navigation
 
-### In Progress
-
-- ⚙ Destination type expansion (groups/supergroups/topics)
-- ⚙ Enterprise dashboard UI polishing
-
 ### Planned
 
-- ○ Subscription and payment automation (USDT TRC20 verification)
-- ○ Owner health and revenue dashboards
+- ○ Destination type expansion (groups/supergroups/topics)
 - ○ Recycle bin and restore window
 
 ## Project Architecture
@@ -72,6 +71,7 @@ Target users:
 │   ├── __init__.py
 │   ├── analytics.py
 │   ├── approval.py
+│   ├── commercial.py
 │   ├── enterprise.py
 │   ├── channels.py
 │   ├── db.py
@@ -95,6 +95,7 @@ Target users:
 │   ├── analytics.py
 │   ├── approval.py
 │   ├── channel.py
+│   ├── commercial.py
 │   ├── post.py
 │   ├── provisioning.py
 │   ├── notifications.py
@@ -123,9 +124,11 @@ Target users:
 │   ├── helpers.py
 │   ├── logger.py
 │   ├── permissions.py
+│   ├── rate_limit.py
 │   └── validators.py
 ├── tests/
 │   └── test_integration_milestone8.py
+│   └── test_integration_milestone9.py
 ├── bot.py
 ├── config.py
 ├── requirements.txt
@@ -172,7 +175,7 @@ Commercial plan model:
 Payment method:
 
 - USDT TRC20
-- Automatic verification (Planned)
+- Automatic verification (Implemented)
 
 ## Current Development Status
 
@@ -180,8 +183,8 @@ Payment method:
 - [x] Phase 2: Destination, draft, and publishing workflows
 - [x] Phase 3: Scheduler and callback actions
 - [x] Phase 4: RBAC foundation and approval controls
-- [ ] Phase 5: Subscription/payment automation
-- [ ] Phase 6: Owner dashboards, analytics, notifications, backups
+- [x] Phase 5: Subscription/payment automation
+- [x] Phase 6: Owner dashboards, analytics, notifications, backups
 
 ## Installation
 
@@ -206,6 +209,8 @@ Payment method:
 	- DATABASE
 	- LOG_LEVEL
 	- TIMEZONE
+	- USDT_TRC20_WALLET
+	- TRON_API_KEY
 
 5. Run Bot
 
@@ -245,16 +250,22 @@ Current SQLite tables:
 - workspace_timezones: workspace-level timezone preferences
 - notifications: owner/admin/editor notification center records
 - central_audit_log: global action audit timeline
+- subscription_plans: active commercial plans and pricing
+- admin_subscriptions: subscription lifecycle and expiry snapshots per admin
+- payment_requests: pending payment verification requests
+- payment_history: immutable verified payment ledger
+- system_backups: backup metadata and status tracking
+- error_reports: captured runtime errors with source/context
 
 ## Future Roadmap
 
 Flowza v1.1:
 
-- Destination type expansion, enterprise dashboard UI, advanced pagination views
+- Destination type expansion, recycle bin restore window, enterprise dashboard UI refinements
 
 Flowza v2.0:
 
-- Subscription billing automation, owner command center, backup/restore workflows, enterprise reporting
+- Multi-network billing, advanced owner command center, backup restore orchestration, enterprise reporting
 
 ## License
 

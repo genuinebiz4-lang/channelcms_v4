@@ -1,7 +1,7 @@
 # ARCHITECTURE
 
 Product: Flowza v1.0  
-Version: Flowza v1.0.2
+Version: Flowza v1.0.3
 
 ## Overview
 
@@ -15,11 +15,11 @@ Flowza uses a modular Python architecture with clear separation between routing,
   - routers/callback_router.py dispatches callback_data actions
   - routers/message_router.py dispatches state-based messages
 - Handler layer:
-  - handlers/* implement destination, post, scheduler, settings, provisioning, approval, workspace, analytics, and notification behavior
+  - handlers/* implement destination, post, scheduler, settings, provisioning, approval, workspace, analytics, notification, and commercial behavior
 - UI layer:
   - keyboards/* build inline keyboard markup
 - Data layer:
-  - database/* manages SQLite schema and persistence, including enterprise retry/history/notification/audit models
+  - database/* manages SQLite schema and persistence, including enterprise retry/history/notification/audit models and commercial subscription/payment/backup/error models
 - Utility layer:
   - utils/* provides logging, permissions, and helper functions
 
@@ -33,8 +33,11 @@ Flowza uses a modular Python architecture with clear separation between routing,
 - Media and templates are persisted at workspace scope with search and rendering helpers.
 - Enterprise scheduler reliability is implemented with retry queue processing and restart restoration.
 - Central audit and notification services provide cross-module observability.
+- Commercial controls enforce subscription-aware operational access for admin/editor publishing and scheduling.
+- Error handling captures unhandled failures into persistent reports and owner alerts.
 
 ## Planned Architecture Extensions
 
-- Payment verification queue and retry workers
+- Payment verification queue hardening and multi-network billing adapters
+- Backup restore orchestration pipeline
 
