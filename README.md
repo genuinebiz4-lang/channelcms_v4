@@ -6,7 +6,7 @@ Automate.
 Schedule.  
 Grow.
 
-Version: Flowza v1.0.1
+Version: Flowza v1.0.2
 
 ## About
 
@@ -37,6 +37,11 @@ Target users:
 - ✔ Media Library (workspace-scoped upload/search/delete with dedupe)
 - ✔ Template Engine (create/edit/delete/apply variable-based templates)
 - ✔ Global Search (workspace, collection, media, templates, destinations, drafts, editors)
+- ✔ Enterprise Scheduler (retry queue, FloodWait handling, auto-recovery, retry stats, conflict checks)
+- ✔ Analytics Engine (owner/admin/workspace/collection/destination/editor scopes)
+- ✔ Notification Center (owner/admin/editor notifications with read state)
+- ✔ Central Audit Log (cross-module action history)
+- ✔ Performance Layer (SQLite WAL mode, maintenance cleanup, vacuum command)
 - ✔ Settings Dashboard (role and approval status)
 - ✔ Structured Logging
 - ✔ SQLite Database Layer
@@ -44,15 +49,13 @@ Target users:
 
 ### In Progress
 
-- ⚙ Analytics module integration
 - ⚙ Destination type expansion (groups/supergroups/topics)
-- ⚙ Scheduler recovery lifecycle hardening
+- ⚙ Enterprise dashboard UI polishing
 
 ### Planned
 
 - ○ Subscription and payment automation (USDT TRC20 verification)
 - ○ Owner health and revenue dashboards
-- ○ Notification center
 - ○ Recycle bin and restore window
 
 ## Project Architecture
@@ -69,6 +72,7 @@ Target users:
 │   ├── __init__.py
 │   ├── analytics.py
 │   ├── approval.py
+│   ├── enterprise.py
 │   ├── channels.py
 │   ├── db.py
 │   ├── drafts.py
@@ -93,6 +97,7 @@ Target users:
 │   ├── channel.py
 │   ├── post.py
 │   ├── provisioning.py
+│   ├── notifications.py
 │   ├── scheduler.py
 │   ├── settings.py
 │   ├── start.py
@@ -119,6 +124,8 @@ Target users:
 │   ├── logger.py
 │   ├── permissions.py
 │   └── validators.py
+├── tests/
+│   └── test_integration_milestone8.py
 ├── bot.py
 ├── config.py
 ├── requirements.txt
@@ -232,12 +239,18 @@ Current SQLite tables:
 - media_library: workspace media asset index with dedupe keys
 - templates: workspace template records
 - template_variables: variable metadata per template
+- retry_queue: enterprise scheduler retry/backoff queue
+- publish_history: publish success/failure timeline for analytics
+- scheduler_conflicts: schedule collision detection records
+- workspace_timezones: workspace-level timezone preferences
+- notifications: owner/admin/editor notification center records
+- central_audit_log: global action audit timeline
 
 ## Future Roadmap
 
 Flowza v1.1:
 
-- Analytics UI, destination type expansion, scheduler reliability hardening
+- Destination type expansion, enterprise dashboard UI, advanced pagination views
 
 Flowza v2.0:
 

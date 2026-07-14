@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## Flowza v1.0.2 - 2026-07-15
+
+### Added
+
+- Enterprise scheduler extensions: retry queue, retry worker, FloodWait/RetryAfter handling, restart recovery of pending jobs, conflict detection, retry stats
+- Publish history tracking for manual and scheduled publishing outcomes
+- Workspace timezone persistence for scheduler execution context
+- Analytics command layer for owner/admin/workspace/collection/destination/editor scopes
+- Notification Center command layer with read-state controls
+- Central audit log and audit command surface
+- Enterprise global search command across audit, notifications, history, and retry queue
+- Milestone 8 integration test scaffold for workspace/collection/media/template/analytics/search flows
+
+### Changed
+
+- SQLite connection manager now applies WAL mode and performance pragmas
+- Bot startup now initializes enterprise database schema and registers analytics/notification handlers
+- Scheduler now auto-restores pending jobs on startup and processes retry queue in background
+- Documentation and release metadata bumped to v1.0.2
+
+### Planned
+
+- Subscription/payment automation and owner billing dashboards
+- Destination type expansion and richer enterprise dashboards
+
 ## Flowza v1.0.1 - 2026-07-14
 
 ### Added

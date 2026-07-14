@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 
 from database.channels import get_channels, get_default_channel
 from database.approval import cancel_for_draft, mark_published_for_draft
+from database.enterprise import create_notification, log_audit, record_publish
 from database.drafts import (
     delete,
     get_latest,
@@ -526,6 +527,23 @@ async def publish_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE,
             raise ValueError("Unsupported draft type")
 
         logger.info("Published successfully to channel %s", channel_id)
+        await record_publish(
+            draft_id=int(draft.get("id") or 0),
+            channel_id=int(channel_id),
+            workspace_id=None,
+            collection_id=None,
+            editor_id=int(update.effective_user.id) if update.effective_user else None,
+            published_via="manual",
+            status="published",
+        )
+        await log_audit(
+            actor_id=int(update.effective_user.id) if update.effective_user else None,
+            actor_role="publisher",
+            action="publish_success",
+            module="post",
+            target_type="channel",
+            target_id=str(channel_id),
+        )
         if draft.get("id"):
             queue_rows = await mark_published_for_draft(int(draft["id"]), channel_id)
             for row in queue_rows:
@@ -541,6 +559,24 @@ async def publish_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await _send_or_edit(update, "🚀 Post published successfully.", keyboard=build_post_keyboard())
     except Exception as exc:
         logger.exception("Publish failed for channel %s: %s", channel_id, exc)
+        await record_publish(
+            draft_id=int(draft.get("id") or 0),
+            channel_id=int(channel_id),
+            workspace_id=None,
+            collection_id=None,
+            editor_id=int(update.effective_user.id) if update.effective_user else None,
+            published_via="manual",
+            status="failed",
+            error_message=str(exc),
+        )
+        if update.effective_user is not None:
+            await create_notification(
+                int(update.effective_user.id),
+                "publisher",
+                "publish",
+                "Publish failed",
+                f"Publishing to channel {channel_id} failed: {exc}",
+            )
         await _send_or_edit(update, "❌ Publish failed. Please try again.", keyboard=build_post_keyboard())
 
 

@@ -10,22 +10,37 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from telegram import Update
+from telegram import InputMediaPhoto, InputMediaVideo, Update
+from telegram.error import RetryAfter
 from telegram.ext import ContextTypes
 
-from config import TIMEZONE
+from config import OWNER_ID, TIMEZONE
 from database.approval import mark_published_for_draft
 from database.channels import get_channel, get_channels, get_default_channel
 from database.drafts import get_draft, get_latest
+from database.enterprise import (
+    create_notification,
+    detect_schedule_conflict,
+    enqueue_retry,
+    get_due_retries,
+    get_retry_statistics,
+    get_workspace_timezone,
+    log_audit,
+    mark_retry_state,
+    record_publish,
+)
 from database.scheduler import (
     add_schedule,
     delete_schedule as delete_schedule_db,
     get_all_schedules,
+    get_pending,
     get_schedule,
     pause_schedule as pause_schedule_db,
     resume_schedule as resume_schedule_db,
     update_schedule,
 )
+from database.settings import get_admin_for_user
+from database.workspace import get_current_workspace
 from keyboards.scheduler import build_schedule_actions_keyboard, build_scheduler_keyboard
 from states import (
     WAITING_SCHEDULE_CONFIRM,
@@ -81,6 +96,8 @@ def initialize_scheduler(application: Any | None = None) -> None:
     if not scheduler.running:
         try:
             scheduler.start()
+            scheduler.add_job(process_retry_queue, trigger=IntervalTrigger(seconds=30), id="retry_queue_worker", replace_existing=True)
+            scheduler.add_job(restore_pending_schedules, trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=2)), id="schedule_restore_worker", replace_existing=True)
         except RuntimeError:
             # run_polling creates the event loop later; retry lazily on first schedule action
             logger.info("Scheduler start deferred until an active event loop is available")
@@ -279,6 +296,22 @@ async def confirm_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         cron_expression = f"every:{context.user_data.get('schedule_interval', 1)}h"
 
     next_run = f"{schedule_date} {schedule_time}"
+    conflict_ids = await detect_schedule_conflict(int(channel_id), schedule_date, schedule_time)
+    if conflict_ids:
+        await message.reply_text(
+            f"⚠ Schedule conflict detected with schedule IDs: {', '.join(str(i) for i in conflict_ids)}. Saving anyway with lower priority."
+        )
+
+    user = update.effective_user
+    admin_id = await get_admin_for_user(user.id) if user else None
+    workspace_id = None
+    timezone_name = TIMEZONE
+    if user and admin_id is not None:
+        ws = await get_current_workspace(user.id, int(admin_id))
+        if ws is not None:
+            workspace_id = int(ws["workspace_id"])
+            timezone_name = await get_workspace_timezone(workspace_id, TIMEZONE)
+
     schedule = await add_schedule(
         draft_id=int(draft_id),
         channel_id=int(channel_id),
@@ -286,7 +319,7 @@ async def confirm_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         schedule_date=schedule_date,
         schedule_time=schedule_time,
         cron_expression=cron_expression,
-        timezone=TIMEZONE,
+        timezone=timezone_name,
         status="pending",
         next_run=next_run,
     )
@@ -295,6 +328,15 @@ async def confirm_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     _schedule_job(schedule)
+    await log_audit(
+        actor_id=int(user.id) if user else None,
+        actor_role="scheduler_user",
+        action="schedule_created",
+        module="scheduler",
+        target_type="schedule",
+        target_id=str(schedule.get("id")),
+        metadata_json=json.dumps({"workspace_id": workspace_id, "conflicts": conflict_ids}),
+    )
     logger.info("Schedule created for draft %s", draft_id)
     context.user_data.pop("schedule_draft_id", None)
     context.user_data.pop("schedule_date", None)
@@ -366,6 +408,14 @@ async def delete_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     deleted = await delete_schedule_db(schedule_id)
     if deleted:
+        await log_audit(
+            actor_id=int(update.effective_user.id) if update.effective_user else None,
+            actor_role="scheduler_user",
+            action="schedule_deleted",
+            module="scheduler",
+            target_type="schedule",
+            target_id=str(schedule_id),
+        )
         logger.info("Schedule deleted %s", schedule_id)
         await _send_or_edit(update, "🗑 Schedule deleted.", keyboard=build_scheduler_keyboard())
         return
@@ -422,7 +472,48 @@ def _schedule_job(schedule: dict[str, Any]) -> None:
         scheduler.add_job(execute_schedule, trigger=IntervalTrigger(hours=interval_value), id=job_id, args=[schedule_id], replace_existing=True)
 
 
-async def execute_schedule(schedule_id: int) -> None:
+async def restore_pending_schedules() -> None:
+    """Restore pending schedules after process restart (auto recovery)."""
+    rows = await get_pending()
+    restored = 0
+    for row in rows:
+        _schedule_job(row)
+        restored += 1
+    if restored:
+        logger.info("Restored %s pending schedules", restored)
+
+
+async def process_retry_queue() -> None:
+    """Retry queue worker with priority ordering and attempt caps."""
+    rows = await get_due_retries(limit=20)
+    for row in rows:
+        retry_id = int(row["id"])
+        attempt = int(row.get("attempt_count") or 0) + 1
+        max_attempts = int(row.get("max_attempts") or 5)
+        if attempt > max_attempts:
+            await mark_retry_state(retry_id, "failed", attempt_count=attempt, last_error="Max retry attempts reached")
+            continue
+
+        await mark_retry_state(retry_id, "processing", attempt_count=attempt)
+        schedule_id = row.get("schedule_id")
+        if not schedule_id:
+            await mark_retry_state(retry_id, "failed", attempt_count=attempt, last_error="Missing schedule_id")
+            continue
+
+        schedule = await get_schedule(int(schedule_id))
+        if not schedule:
+            await mark_retry_state(retry_id, "failed", attempt_count=attempt, last_error="Schedule not found")
+            continue
+
+        try:
+            await execute_schedule(int(schedule_id), from_retry=True)
+            await mark_retry_state(retry_id, "completed", attempt_count=attempt)
+        except Exception as exc:
+            backoff = min(3600, 60 * attempt)
+            await mark_retry_state(retry_id, "queued", attempt_count=attempt, last_error=str(exc), delay_seconds=backoff)
+
+
+async def execute_schedule(schedule_id: int, from_retry: bool = False) -> None:
     """Execute a scheduled post and update its status."""
     schedule = await get_schedule(schedule_id)
     if not schedule:
@@ -432,12 +523,32 @@ async def execute_schedule(schedule_id: int) -> None:
     if not draft:
         await update_schedule(schedule_id, status="failed")
         logger.warning("Schedule %s failed: missing draft", schedule_id)
+        await record_publish(
+            draft_id=None,
+            channel_id=int(schedule.get("channel_id") or 0),
+            workspace_id=None,
+            collection_id=None,
+            editor_id=None,
+            published_via="scheduler",
+            status="failed",
+            error_message="Missing draft",
+        )
         return
 
     channel = await get_channel(int(schedule["channel_id"])) if schedule.get("channel_id") else None
     if not channel:
         await update_schedule(schedule_id, status="failed")
         logger.warning("Schedule %s failed: missing channel", schedule_id)
+        await record_publish(
+            draft_id=int(schedule.get("draft_id") or 0),
+            channel_id=int(schedule.get("channel_id") or 0),
+            workspace_id=None,
+            collection_id=None,
+            editor_id=None,
+            published_via="scheduler",
+            status="failed",
+            error_message="Missing channel",
+        )
         return
 
     application = bot_app
@@ -459,10 +570,91 @@ async def execute_schedule(schedule_id: int) -> None:
                 except Exception:
                     logger.warning("Could not notify editor %s for scheduled queue %s", editor_id, row.get("id"))
         await update_schedule(schedule_id, status="completed", last_run=datetime.now().isoformat(), next_run=None)
+        await record_publish(
+            draft_id=int(schedule.get("draft_id") or 0),
+            channel_id=int(schedule["channel_id"]),
+            workspace_id=None,
+            collection_id=None,
+            editor_id=None,
+            published_via="scheduler_retry" if from_retry else "scheduler",
+            status="published",
+        )
+        await log_audit(
+            actor_id=None,
+            actor_role="system",
+            action="schedule_executed",
+            module="scheduler",
+            target_type="schedule",
+            target_id=str(schedule_id),
+            metadata_json=json.dumps({"from_retry": from_retry}),
+        )
         logger.info("Schedule executed %s", schedule_id)
+    except RetryAfter as exc:
+        wait_seconds = int(getattr(exc, "retry_after", 30) or 30)
+        await enqueue_retry(
+            schedule_id=schedule_id,
+            draft_id=int(schedule.get("draft_id") or 0),
+            channel_id=int(schedule.get("channel_id") or 0),
+            workspace_id=None,
+            retry_reason="flood_wait",
+            priority=10,
+            attempt_count=0,
+            max_attempts=6,
+            delay_seconds=wait_seconds,
+            last_error=f"FloodWait {wait_seconds}s",
+        )
+        await update_schedule(schedule_id, status="pending", last_run=datetime.now().isoformat())
+        if OWNER_ID:
+            await create_notification(
+                OWNER_ID,
+                "owner",
+                "scheduler",
+                "FloodWait retry queued",
+                f"Schedule {schedule_id} delayed for {wait_seconds}s due to Telegram FloodWait.",
+            )
+        logger.warning("Schedule %s delayed by FloodWait %ss", schedule_id, wait_seconds)
     except Exception as exc:
         logger.exception("Schedule failed %s: %s", schedule_id, exc)
         await update_schedule(schedule_id, status="failed", last_run=datetime.now().isoformat())
+        await enqueue_retry(
+            schedule_id=schedule_id,
+            draft_id=int(schedule.get("draft_id") or 0),
+            channel_id=int(schedule.get("channel_id") or 0),
+            workspace_id=None,
+            retry_reason="publish_failure",
+            priority=5,
+            attempt_count=0,
+            max_attempts=5,
+            delay_seconds=120,
+            last_error=str(exc),
+        )
+        await record_publish(
+            draft_id=int(schedule.get("draft_id") or 0),
+            channel_id=int(schedule.get("channel_id") or 0),
+            workspace_id=None,
+            collection_id=None,
+            editor_id=None,
+            published_via="scheduler",
+            status="failed",
+            error_message=str(exc),
+        )
+
+
+async def retry_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show retry queue statistics for scheduler operations."""
+    del context
+    if not await can_manage_schedule(update):
+        await update.effective_message.reply_text("🚫 Access denied.")
+        return
+
+    stats = await get_retry_statistics()
+    await update.effective_message.reply_text(
+        "📈 Retry Queue Stats\n"
+        f"Queued: {stats.get('queued', 0)}\n"
+        f"Processing: {stats.get('processing', 0)}\n"
+        f"Completed: {stats.get('completed', 0)}\n"
+        f"Failed: {stats.get('failed', 0)}"
+    )
 
 
 async def _publish_draft(application: Any, channel_id: int, draft: dict[str, Any]) -> None:
@@ -483,9 +675,9 @@ async def _publish_draft(application: Any, channel_id: int, draft: dict[str, Any
             media = []
             for item in album_items:
                 if item.get("type") == "video":
-                    media.append({"type": "video", "media": item.get("media", "")})
+                    media.append(InputMediaVideo(media=item.get("media", "")))
                 else:
-                    media.append({"type": "photo", "media": item.get("media", "")})
+                    media.append(InputMediaPhoto(media=item.get("media", "")))
             await application.bot.send_media_group(chat_id=channel_id, media=media)
     else:
         raise ValueError("Unsupported draft type")

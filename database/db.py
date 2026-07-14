@@ -15,6 +15,10 @@ def get_connection() -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA journal_mode = WAL")
+    connection.execute("PRAGMA synchronous = NORMAL")
+    connection.execute("PRAGMA busy_timeout = 5000")
+    connection.execute("PRAGMA temp_store = MEMORY")
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
 

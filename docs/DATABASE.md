@@ -1,7 +1,7 @@
 # DATABASE
 
 Product: Flowza v1.0  
-Version: Flowza v1.0.1
+Version: Flowza v1.0.2
 
 ## Engine
 
@@ -66,8 +66,25 @@ Version: Flowza v1.0.1
 19. template_variables
 - Purpose: template variable metadata and default value mappings.
 
+20. retry_queue
+- Purpose: scheduler retry/backoff queue with priority and attempt tracking.
+
+21. publish_history
+- Purpose: immutable publish result timeline for analytics and incident review.
+
+22. scheduler_conflicts
+- Purpose: schedule collision tracking for channel/date/time conflicts.
+
+23. workspace_timezones
+- Purpose: workspace-level timezone preferences for scheduling behavior.
+
+24. notifications
+- Purpose: notification center records for owner/admin/editor users.
+
+25. central_audit_log
+- Purpose: centralized cross-module audit trail.
+
 ## Planned Tables
 
-- analytics aggregates
 - payment/subscription records
 - recycle bin metadata

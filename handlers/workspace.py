@@ -10,6 +10,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 
 from database.provisioning import audit_action, get_editor_profile
 from database.settings import get_admin_for_user
+from database.enterprise import get_workspace_timezone, set_workspace_timezone
 from database.workspace import (
     create_collection,
     create_template,
@@ -1067,6 +1068,45 @@ async def publish_workspace_command(update: Update, context: ContextTypes.DEFAUL
     await update.effective_message.reply_text(f"✅ Publish attempted to {published} destination(s) in workspace {ws['workspace_name']}.")
 
 
+async def workspace_timezone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show current timezone for the selected workspace."""
+    role = await get_request_role(update)
+    if role not in {ROLE_ADMIN, ROLE_EDITOR} and not is_owner(update):
+        await update.effective_message.reply_text("🚫 Access denied.")
+        return
+
+    _admin_id, ws = await _resolve_workspace_context(update, context)
+    if ws is None:
+        return
+    tz = await get_workspace_timezone(int(ws["workspace_id"]), "Asia/Kolkata")
+    await update.effective_message.reply_text(f"🕒 Workspace timezone: {tz}")
+
+
+async def set_workspace_timezone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set timezone for selected workspace."""
+    role = await get_request_role(update)
+    if role != ROLE_ADMIN and not is_owner(update):
+        await update.effective_message.reply_text("🚫 Only Admin can set workspace timezone.")
+        return
+
+    _admin_id, ws = await _resolve_workspace_context(update, context)
+    if ws is None:
+        return
+
+    parts = (update.effective_message.text or "").split(maxsplit=1)
+    if len(parts) < 2:
+        await update.effective_message.reply_text("Usage: /setworkspacetimezone <IANA timezone>")
+        return
+
+    timezone_name = parts[1].strip()
+    ok = await set_workspace_timezone(int(ws["workspace_id"]), timezone_name, int(update.effective_user.id))
+    if not ok:
+        await update.effective_message.reply_text("Unable to set timezone for current workspace.")
+        return
+
+    await update.effective_message.reply_text(f"✅ Workspace timezone updated to: {timezone_name}")
+
+
 def register_workspace_handlers(application: Application) -> None:
     """Register Milestone 7 workspace commands."""
     application.add_handler(CommandHandler("createworkspace", create_workspace_command))
@@ -1096,3 +1136,5 @@ def register_workspace_handlers(application: Application) -> None:
 
     application.add_handler(CommandHandler("publishcollection", publish_collection_command))
     application.add_handler(CommandHandler("publishworkspace", publish_workspace_command))
+    application.add_handler(CommandHandler("workspacetimezone", workspace_timezone_command))
+    application.add_handler(CommandHandler("setworkspacetimezone", set_workspace_timezone_command))

@@ -1,13 +1,13 @@
 # ROADMAP
 
 Product: Flowza v1.0  
-Version: Flowza v1.0.1
+Version: Flowza v1.0.2
 
 ## Flowza v1.1 (Planned)
 
-- Analytics dashboards by destination and period
 - Destination type expansion (groups/supergroups/topics)
-- Scheduler recovery lifecycle hardening
+- Enterprise dashboard UI and drill-down reports
+- Advanced pagination and lazy-loading UX refinements
 
 ## Flowza v2.0 (Planned)
 
