@@ -1,4 +1,4 @@
-"""Centralized logging configuration for ChannelCMS V4."""
+"""Centralized logging configuration for Flowza v1.0."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 def setup_logging() -> logging.Logger:
     """Configure console and file logging."""
-    logger = logging.getLogger("channelcms_v4")
+    logger = logging.getLogger("flowza_v1")
     logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
     logger.propagate = False
 
@@ -29,7 +29,7 @@ def setup_logging() -> logging.Logger:
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
-    file_handler = logging.FileHandler(LOG_DIR / "channelcms_v4.log", encoding="utf-8")
+    file_handler = logging.FileHandler(LOG_DIR / "flowza_v1.log", encoding="utf-8")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 

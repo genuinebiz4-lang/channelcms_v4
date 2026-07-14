@@ -1,4 +1,4 @@
-"""Channel management handlers for ChannelCMS V4."""
+"""Channel management handlers for Flowza v1.0."""
 
 from __future__ import annotations
 
@@ -15,6 +15,8 @@ from database.channels import (
     set_default_channel as persist_default_channel,
     total_channels,
 )
+from database.provisioning import assign_destination_owner
+from database.settings import get_admin_for_user
 from keyboards.channel import (
     build_channel_manager_keyboard,
     build_channel_selection_keyboard,
@@ -22,7 +24,7 @@ from keyboards.channel import (
 )
 from states import WAITING_CHANNEL_FORWARD
 from utils.logger import get_logger
-from utils.permissions import is_owner
+from utils.permissions import can_manage_destinations
 
 logger = get_logger(__name__)
 
@@ -46,24 +48,24 @@ async def _send_or_edit(
 
 async def channel_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show the channel management dashboard."""
-    if not is_owner(update):
-        await _send_or_edit(update, "🚫 Only the owner can manage channels.", answer_text="Access denied")
+    if not await can_manage_destinations(update):
+        await _send_or_edit(update, "🚫 Only Admin accounts can manage destinations.", answer_text="Access denied")
         return
 
     default_channel = await get_default_channel()
     text = (
-        "📢 Channel Management\n\n"
+        "📢 Destination Manager\n\n"
         f"Total Channels: {await total_channels()}\n"
         f"Default Channel: {default_channel.get('title') if default_channel else 'None'}\n\n"
-        "Use the buttons below to add, review, or manage your channels."
+        "Use the buttons below to add, review, or manage your destinations."
     )
     await _send_or_edit(update, text, keyboard=build_channel_manager_keyboard())
 
 
 async def add_channel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Ask the user to forward a message from a channel."""
-    if not is_owner(update):
-        await _send_or_edit(update, "🚫 Only the owner can add channels.", answer_text="Access denied")
+    if not await can_manage_destinations(update):
+        await _send_or_edit(update, "🚫 Only Admin accounts can add destinations.", answer_text="Access denied")
         return
 
     context.user_data["channel_state"] = WAITING_CHANNEL_FORWARD
@@ -76,8 +78,8 @@ async def add_channel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def receive_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Process a forwarded channel message and save the channel."""
-    if not is_owner(update):
-        await _send_or_edit(update, "🚫 Only the owner can add channels.", answer_text="Access denied")
+    if not await can_manage_destinations(update):
+        await _send_or_edit(update, "🚫 Only Admin accounts can add destinations.", answer_text="Access denied")
         return
 
     message = update.effective_message
@@ -148,6 +150,13 @@ async def receive_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         description=description,
         member_count=member_count,
     )
+
+    actor = update.effective_user
+    if actor is not None:
+        admin_scope = await get_admin_for_user(actor.id)
+        if admin_scope is not None:
+            await assign_destination_owner(channel_id, admin_scope)
+
     context.user_data.pop("channel_state", None)
     logger.info("Channel added: %s", channel_id)
     await message.reply_text(
@@ -160,8 +169,8 @@ async def receive_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def list_channels(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show all configured channels."""
-    if not is_owner(update):
-        await _send_or_edit(update, "🚫 Only the owner can view channels.", answer_text="Access denied")
+    if not await can_manage_destinations(update):
+        await _send_or_edit(update, "🚫 Only Admin accounts can view destinations.", answer_text="Access denied")
         return
 
     channels = await get_channels()
@@ -188,8 +197,8 @@ async def list_channels(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def default_channel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show available channels for selection as the new default channel."""
-    if not is_owner(update):
-        await _send_or_edit(update, "🚫 Only the owner can change the default channel.", answer_text="Access denied")
+    if not await can_manage_destinations(update):
+        await _send_or_edit(update, "🚫 Only Admin accounts can change the default destination.", answer_text="Access denied")
         return
 
     channels = await get_channels()
@@ -207,8 +216,8 @@ async def default_channel_menu(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def set_default_channel(update: Update, context: ContextTypes.DEFAULT_TYPE, channel_id: int) -> None:
     """Set a channel as the default channel."""
-    if not is_owner(update):
-        await _send_or_edit(update, "🚫 Only the owner can change the default channel.", answer_text="Access denied")
+    if not await can_manage_destinations(update):
+        await _send_or_edit(update, "🚫 Only Admin accounts can change the default destination.", answer_text="Access denied")
         return
 
     success = await persist_default_channel(channel_id)
@@ -224,8 +233,8 @@ async def set_default_channel(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def remove_channel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show channels available for removal."""
-    if not is_owner(update):
-        await _send_or_edit(update, "🚫 Only the owner can remove channels.", answer_text="Access denied")
+    if not await can_manage_destinations(update):
+        await _send_or_edit(update, "🚫 Only Admin accounts can remove destinations.", answer_text="Access denied")
         return
 
     channels = await get_channels()
@@ -248,8 +257,8 @@ async def remove_channel_confirm(
     confirmed: bool = False,
 ) -> None:
     """Ask for confirmation before deleting a channel, or delete it if confirmed."""
-    if not is_owner(update):
-        await _send_or_edit(update, "🚫 Only the owner can remove channels.", answer_text="Access denied")
+    if not await can_manage_destinations(update):
+        await _send_or_edit(update, "🚫 Only Admin accounts can remove destinations.", answer_text="Access denied")
         return
 
     channel = await get_channel(channel_id)

@@ -1,4 +1,4 @@
-"""Shared helper utilities for ChannelCMS V4."""
+"""Shared helper utilities for Flowza v1.0."""
 
 from __future__ import annotations
 

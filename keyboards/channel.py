@@ -1,4 +1,4 @@
-"""Inline keyboard builders for the channel management module."""
+"""Inline keyboard builders for the destination management module."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
 def build_channel_manager_keyboard() -> InlineKeyboardMarkup:
-    """Create the main channel management keyboard."""
+    """Create the main destination management keyboard."""
     buttons = [
-        [InlineKeyboardButton("➕ Add Channel", callback_data="channel:add")],
-        [InlineKeyboardButton("📋 My Channels", callback_data="channel:list")],
-        [InlineKeyboardButton("⭐ Default Channel", callback_data="channel:default_menu")],
-        [InlineKeyboardButton("🗑 Remove Channel", callback_data="channel:remove_menu")],
+        [InlineKeyboardButton("➕ Add Destination", callback_data="channel:add")],
+        [InlineKeyboardButton("📋 My Destinations", callback_data="channel:list")],
+        [InlineKeyboardButton("⭐ Default Destination", callback_data="channel:default_menu")],
+        [InlineKeyboardButton("🗑 Remove Destination", callback_data="channel:remove_menu")],
         [InlineKeyboardButton("🔄 Refresh", callback_data="channel:refresh")],
         [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:channels")],
     ]

@@ -1,4 +1,4 @@
-"""Entry point for the ChannelCMS V4 Telegram bot."""
+"""Entry point for the Flowza v1.0 Telegram bot."""
 
 from __future__ import annotations
 
@@ -7,9 +7,19 @@ import sys
 
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, MessageHandler, filters
 
-from config import BOT_TOKEN
+from config import APP_TITLE, BOT_TOKEN, VERSION
 from database.channels import initialize as initialize_channels
 from database.db import init_db
+from database.drafts import initialize as initialize_drafts
+from database.provisioning import initialize as initialize_provisioning_db
+from database.approval import initialize as initialize_approval_db
+from database.workspace import initialize as initialize_workspace_db
+from database.scheduler import initialize as initialize_scheduler_db
+from database.settings import initialize as initialize_settings_db
+from handlers.approval import register_approval_handlers
+from handlers.provisioning import register_provisioning_handlers
+from handlers.workspace import register_workspace_handlers
+from handlers.scheduler import initialize_scheduler, shutdown_scheduler
 from handlers.start import register_start_handler
 from routers.callback_router import handle_callback
 from routers.message_router import handle_message
@@ -26,6 +36,9 @@ def build_application() -> object | None:
 
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     register_start_handler(application)
+    register_provisioning_handlers(application)
+    register_approval_handlers(application)
+    register_workspace_handlers(application)
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(handle_callback))
     return application
@@ -34,11 +47,24 @@ def build_application() -> object | None:
 def main() -> int:
     """Initialize the application and start the bot loop."""
     setup_logging()
-    logger.info("Starting ChannelCMS V4")
+    logger.info("Starting %s", APP_TITLE)
+    logger.info("Version: %s", VERSION)
     init_db()
     logger.info("SQLite database initialized")
     asyncio.run(initialize_channels())
     logger.info("Channel database initialized")
+    asyncio.run(initialize_drafts())
+    logger.info("Draft database initialized")
+    asyncio.run(initialize_scheduler_db())
+    logger.info("Scheduler database initialized")
+    asyncio.run(initialize_settings_db())
+    logger.info("Settings database initialized")
+    asyncio.run(initialize_provisioning_db())
+    logger.info("Provisioning database initialized")
+    asyncio.run(initialize_approval_db())
+    logger.info("Approval database initialized")
+    asyncio.run(initialize_workspace_db())
+    logger.info("Workspace database initialized")
 
     application = build_application()
     if application is None:
@@ -48,8 +74,10 @@ def main() -> int:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
+        initialize_scheduler(application)
         application.run_polling(allowed_updates=["message", "callback_query"])
     finally:
+        shutdown_scheduler()
         loop.close()
         asyncio.set_event_loop(None)
 

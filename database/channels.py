@@ -1,4 +1,4 @@
-"""Channel persistence layer for ChannelCMS V4."""
+"""Channel persistence layer for Flowza v1.0."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Validation helpers for ChannelCMS V4."""
+"""Validation helpers for Flowza v1.0."""
 
 from __future__ import annotations
 
