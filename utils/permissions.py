@@ -5,8 +5,6 @@ from __future__ import annotations
 from telegram import Update
 
 from config import OWNER_ID
-from database.commercial import is_subscription_active
-from database.provisioning import get_admin_profile
 from database.settings import get_admin_for_user, get_user_role, is_approval_required
 
 ROLE_OWNER = "owner"
@@ -46,16 +44,7 @@ async def can_publish_content(update: Update) -> bool:
     """Return whether the user can publish immediately."""
     role = await get_request_role(update)
     if role in {ROLE_OWNER, ROLE_ADMIN}:
-        if role == ROLE_OWNER:
-            return True
-        user = update.effective_user
-        if user is None:
-            return False
-        admin_id = await get_admin_for_user(user.id)
-        if admin_id is None:
-            return False
-        admin_profile = await get_admin_profile(int(admin_id))
-        return await is_subscription_active(int(admin_id), admin_profile.get("trial_end") if admin_profile else None)
+        return True
     if role != ROLE_EDITOR:
         return False
 
@@ -65,27 +54,13 @@ async def can_publish_content(update: Update) -> bool:
     admin_id = await get_admin_for_user(user.id)
     if admin_id is None:
         return False
-    admin_profile = await get_admin_profile(int(admin_id))
-    if not await is_subscription_active(int(admin_id), admin_profile.get("trial_end") if admin_profile else None):
-        return False
     return not await is_approval_required(admin_id)
 
 
 async def can_manage_schedule(update: Update) -> bool:
     """Return whether the user can create and maintain schedules."""
     role = await get_request_role(update)
-    if role == ROLE_OWNER:
-        return True
-    if role not in {ROLE_ADMIN, ROLE_EDITOR}:
-        return False
-    user = update.effective_user
-    if user is None:
-        return False
-    admin_id = await get_admin_for_user(user.id)
-    if admin_id is None:
-        return False
-    admin_profile = await get_admin_profile(int(admin_id))
-    return await is_subscription_active(int(admin_id), admin_profile.get("trial_end") if admin_profile else None)
+    return role in {ROLE_OWNER, ROLE_ADMIN, ROLE_EDITOR}
 
 
 async def can_manage_settings(update: Update) -> bool:

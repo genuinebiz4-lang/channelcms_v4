@@ -13,7 +13,7 @@ load_dotenv(ENV_PATH)
 
 APP_NAME = "Flowza"
 APP_TITLE = "Flowza v1.0"
-VERSION = "Flowza v1.0.3"
+VERSION = "Flowza v1.0.4"
 
 
 def _get_int_env(name: str, default: int = 0) -> int:

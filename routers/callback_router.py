@@ -61,14 +61,14 @@ from handlers.help_center import (
 )
 from handlers.commercial import (
     admin_menu_callback,
+    backup_command,
     editor_menu_callback,
+    health_command,
     owner_menu_callback,
-    subscription_command,
-    subscription_back_callback,
-    subscription_copy_wallet_callback,
-    subscription_payment_history_callback,
-    subscription_verify_payment_callback,
+    system_command,
+    subscribers_command,
 )
+from handlers.analytics import admin_analytics_command
 from handlers.provisioning import (
     add_admin_cancel_callback,
     add_admin_confirm_callback,
@@ -199,19 +199,37 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await settings_dashboard(update, context)
         return
 
-    if data in {"dashboard:owner_system", "dashboard:owner_payments", "dashboard:owner_users", "dashboard:owner_health", "dashboard:owner_backup"}:
+    if data == "dashboard:owner_system":
         await safe_answer(query)
-        await owner_menu_callback(update, context)
+        await system_command(update, context)
+        return
+
+    if data == "dashboard:owner_users":
+        await safe_answer(query)
+        await subscribers_command(update, context)
+        return
+
+    if data == "dashboard:owner_health":
+        await safe_answer(query)
+        await health_command(update, context)
+        return
+
+    if data == "dashboard:owner_backup":
+        await safe_answer(query)
+        await backup_command(update, context)
+        return
+
+    if data == "dashboard:owner_payments":
+        await safe_answer(query, "Commercial payment workflows are disabled in free mode.", show_alert=True)
         return
 
     if data == "dashboard:admin_analytics":
         await safe_answer(query)
-        await admin_menu_callback(update, context)
+        await admin_analytics_command(update, context)
         return
 
     if data == "dashboard:admin_subscription":
-        await safe_answer(query)
-        await subscription_command(update, context)
+        await safe_answer(query, "Flowza v1.0 is running in free mode. Commercial features are disabled.", show_alert=True)
         return
 
     if data == "dashboard:editor_approval":
@@ -266,23 +284,20 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
         return
 
     if data == "commercial:copy_wallet":
-        await safe_answer(query)
-        await subscription_copy_wallet_callback(update, context)
+        await safe_answer(query, "Commercial features are disabled in free mode.", show_alert=True)
         return
 
     if data == "commercial:verify_payment":
-        await safe_answer(query)
-        await subscription_verify_payment_callback(update, context)
+        await safe_answer(query, "Commercial features are disabled in free mode.", show_alert=True)
         return
 
     if data == "commercial:payment_history":
-        await safe_answer(query)
-        await subscription_payment_history_callback(update, context)
+        await safe_answer(query, "Commercial features are disabled in free mode.", show_alert=True)
         return
 
     if data == "commercial:back":
         await safe_answer(query)
-        await subscription_back_callback(update, context)
+        await send_dashboard(update, context)
         return
 
     if data == "settings:dashboard":

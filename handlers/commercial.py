@@ -587,11 +587,8 @@ async def owner_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await safe_edit_message(
         query,
         "👑 Owner Menu\n\n"
-        "System: /system /health /database /maintenance\n"
-        "Payments: /revenue /payments /paymentstats\n"
-        "Users: /subscribers /expiredusers\n"
-        "Backup: /backup\n"
-        "Errors: /errors"
+        "Use the dashboard buttons to manage system operations, users, backups, and health.\n\n"
+        "Navigation is button-first in Flowza v1.0.4."
     )
 
 
@@ -603,12 +600,8 @@ async def admin_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     await safe_edit_message(
         query,
         "🧑‍💼 Admin Menu\n\n"
-        "Workspace: /workspaces /switchworkspace\n"
-        "Destinations: /channels /addchannel\n"
-        "Posts: /postdashboard /publishworkspace\n"
-        "Scheduler: /scheduler /retrystats\n"
-        "Analytics: /adminanalytics /workspaceanalytics\n"
-        "Subscription: /plans /subscription /renew"
+        "Use dashboard buttons for Workspace, Destinations, Posts, Scheduler, Analytics, and Settings.\n\n"
+        "Commands are only used when text input is required."
     )
 
 
@@ -620,9 +613,7 @@ async def editor_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await safe_edit_message(
         query,
         "✍ Editor Menu\n\n"
-        "Drafts: /postdashboard\n"
-        "Assigned Destinations: /collections\n"
-        "Approval Queue: /approvalqueue"
+        "Use dashboard buttons for Drafts, Assigned Destinations, Scheduler, and Approval Queue."
     )
 
 

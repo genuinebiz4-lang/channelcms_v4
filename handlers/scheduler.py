@@ -46,7 +46,7 @@ from database.scheduler import (
 )
 from database.settings import get_admin_for_user
 from database.workspace import get_current_workspace
-from handlers.commercial import run_daily_commercial_jobs, run_scheduled_backup
+from handlers.commercial import run_scheduled_backup
 from keyboards.scheduler import (
     build_schedule_actions_keyboard,
     build_schedule_destination_keyboard,
@@ -109,7 +109,6 @@ def initialize_scheduler(application: Any | None = None) -> None:
             scheduler.start()
             scheduler.add_job(process_retry_queue, trigger=IntervalTrigger(seconds=30), id="retry_queue_worker", replace_existing=True)
             scheduler.add_job(restore_pending_schedules, trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=2)), id="schedule_restore_worker", replace_existing=True)
-            scheduler.add_job(run_daily_jobs, trigger=CronTrigger(hour=0, minute=15), id="daily_commercial_worker", replace_existing=True)
             scheduler.add_job(run_daily_backup_job, trigger=CronTrigger(hour=1, minute=0), id="daily_backup_worker", replace_existing=True)
             scheduler.add_job(run_weekly_backup_job, trigger=CronTrigger(day_of_week="sun", hour=2, minute=0), id="weekly_backup_worker", replace_existing=True)
         except RuntimeError:
@@ -571,13 +570,6 @@ async def process_retry_queue() -> None:
         except Exception as exc:
             backoff = min(3600, 60 * attempt)
             await mark_retry_state(retry_id, "queued", attempt_count=attempt, last_error=str(exc), delay_seconds=backoff)
-
-
-async def run_daily_jobs() -> None:
-    """Run daily subscription/notification sweeps."""
-    if bot_app is None:
-        return
-    await run_daily_commercial_jobs(bot_app)
 
 
 async def run_daily_backup_job() -> None:

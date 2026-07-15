@@ -11,7 +11,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from config import BASE_DIR, VERSION
-from keyboards.help_center import build_help_center_keyboard
+from keyboards.help_center import build_help_center_keyboard, build_support_keyboard
 from utils.telegram_safety import safe_edit_message
 
 SUPPORT_USERNAME = "@Lazy999000"
@@ -28,10 +28,11 @@ HELP_CONTENT = {
     "templates": "Templates support placeholders and reusable content bodies.",
     "team": "Owner manages admins/editors. Admins control assignments and permissions.",
     "analytics": "Analytics dashboards show owner, admin, workspace, collection, destination, and editor scopes.",
-    "subscription": "Flowza Pro supports plan visibility, renewal request, and payment verification.",
-    "payments": "Submit TRC20 tx hash after renewal request for verification.",
+    "settings": "Settings controls approval workflow and role-based publishing behavior.",
+    "subscription": "Flowza runs in free mode. No subscription is required.",
+    "payments": "Payment workflows are disabled in free mode.",
     "faq": "Use Help Center sections for setup and operations. Contact support for unresolved issues.",
-    "troubleshooting": "Common checks: bot admin rights, destination existence, selected workspace, and active subscription.",
+    "troubleshooting": "Common checks: bot admin rights, destination existence, selected workspace, and editor/admin permissions.",
 }
 
 
@@ -78,23 +79,22 @@ async def support_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         f"Open Chat: {SUPPORT_LINK}\n\n"
         "Support Type:\n"
         "- Technical\n"
-        "- Billing\n"
         "- Admin Requests\n"
         "- Feature Requests\n"
         "- Bug Reports",
-        reply_markup=build_help_center_keyboard(),
+        reply_markup=build_support_keyboard(),
     )
 
 
 def _manual_output_path() -> Path:
     out_dir = BASE_DIR / "assets" / "documents"
     out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir / "Flowza_User_Manual_v1.0.3.pdf"
+    return out_dir / "Flowza_User_Manual_v1.0.4.pdf"
 
 
 def _collect_doc_sections() -> list[tuple[str, str]]:
     sections: list[tuple[str, str]] = [
-        ("Introduction", "Flowza is a commercial Telegram content platform for teams."),
+        ("Introduction", "Flowza is a Telegram publishing workspace for teams."),
         ("Getting Started", "Create workspace, add destination, compose post, publish or schedule."),
         ("Workspace", "Use workspace manager for isolated operations."),
         ("Destinations", "Manage channels/groups and ownership."),
@@ -106,11 +106,10 @@ def _collect_doc_sections() -> list[tuple[str, str]]:
         ("Media Library", "Store Telegram file IDs for reuse."),
         ("Approval Flow", "Editors submit, admins approve/reject."),
         ("Analytics", "Track publishing and usage metrics."),
-        ("Subscription", "Flowza Pro plan and renewal lifecycle."),
-        ("Payments", "USDT TRC20 verification process."),
+        ("Settings", "Use settings to control approval workflow behavior for editors and admins."),
         ("FAQ", "Use Help Center and support contact paths."),
         ("Support", f"Contact {SUPPORT_USERNAME} at {SUPPORT_LINK}."),
-        ("Troubleshooting", "Check bot permissions, workspace scope, and destination validity."),
+        ("Troubleshooting", "Check bot permissions, workspace scope, destination validity, and role mapping."),
         ("Flowza Version", VERSION),
     ]
 

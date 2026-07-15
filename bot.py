@@ -15,10 +15,8 @@ from database.provisioning import initialize as initialize_provisioning_db
 from database.approval import initialize as initialize_approval_db
 from database.workspace import initialize as initialize_workspace_db
 from database.enterprise import initialize as initialize_enterprise_db
-from database.commercial import initialize as initialize_commercial_db
 from database.scheduler import initialize as initialize_scheduler_db
 from database.settings import initialize as initialize_settings_db
-from handlers.commercial import global_error_handler, register_commercial_handlers
 from handlers.analytics import register_analytics_handlers
 from handlers.channel import register_channel_handlers
 from handlers.notifications import register_notification_handlers
@@ -48,11 +46,9 @@ def build_application() -> object | None:
     register_workspace_handlers(application)
     register_channel_handlers(application)
     register_help_center_handlers(application)
-    register_commercial_handlers(application)
     register_analytics_handlers(application)
     register_notification_handlers(application)
     application.add_handler(CommandHandler("retrystats", retry_stats_command))
-    application.add_error_handler(global_error_handler)
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(handle_callback))
     return application
@@ -81,8 +77,6 @@ def main() -> int:
     logger.info("Workspace database initialized")
     asyncio.run(initialize_enterprise_db())
     logger.info("Enterprise database initialized")
-    asyncio.run(initialize_commercial_db())
-    logger.info("Commercial database initialized")
 
     application = build_application()
     if application is None:

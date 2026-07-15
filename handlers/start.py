@@ -8,6 +8,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from config import APP_TITLE, VERSION
 from database.settings import get_admin_for_user
 from database.workspace import get_current_workspace
+from utils.permissions import is_owner
 from keyboards.dashboard import (
     build_admin_dashboard_keyboard,
     build_dashboard_keyboard,
@@ -59,10 +60,32 @@ async def send_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             logger.info("Handled /start setup wizard for user %s", user.id)
             return
 
+    admin_label = "System"
+    workspace_label = "Not selected"
+    if role == ROLE_ADMIN:
+        admin_label = str(user.id)
+        admin_id = await get_admin_for_user(user.id)
+        if admin_id is not None:
+            ws = await get_current_workspace(user.id, int(admin_id))
+            if ws is not None:
+                workspace_label = str(ws.get("workspace_name") or "Not selected")
+    elif role == ROLE_EDITOR:
+        admin_id = await get_admin_for_user(user.id)
+        admin_label = str(admin_id) if admin_id is not None else "Unassigned"
+        if admin_id is not None:
+            ws = await get_current_workspace(user.id, int(admin_id))
+            if ws is not None:
+                workspace_label = str(ws.get("workspace_name") or "Not selected")
+    elif is_owner(update):
+        admin_label = "Owner"
+        workspace_label = "Global"
+
     message = (
-        "🚀 Flowza Dashboard\n\n"
-        "Commercial Telegram Content Platform\n\n"
-        "Navigate with buttons below.\n"
+        "🚀 Welcome to Flowza\n\n"
+        "Your Telegram Publishing Workspace\n\n"
+        f"Workspace: {workspace_label}\n"
+        f"Admin Name: {admin_label}\n"
+        f"Role: {(role or 'guest').title()}\n"
         f"Version: {VERSION}"
     )
     if role == ROLE_OWNER:
