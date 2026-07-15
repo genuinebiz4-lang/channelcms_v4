@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## Flowza v1.0.3 RC - 2026-07-15
+
+### Added
+
+- Button-first dashboard expansion across workspace, destinations, posts, scheduler, analytics, subscription, settings, and help/support sections
+- First-run setup wizard for new admin onboarding (workspace → destination → first post → publish)
+- Help Center module with sectioned guidance, troubleshooting, and support page
+- User manual PDF generation and download workflow from Help Center
+- Scheduler destination picker callback flow (`scheduler:dest:<channel_id>`) for explicit destination selection before schedule confirmation
+- Audio and voice composer states plus publishing support
+
+### Changed
+
+- Callback payload parser hardened to accept signed Telegram IDs and prevent false malformed rejection for destination callbacks
+- Composer draft finalization now always creates a new draft to prevent stale media/text reuse across uploads
+- Subscription screen redesigned with Flowza Pro commercial layout, 28/84/365 day plans, TRC20 network details, and action buttons
+- Workspace dashboard switched from command-list copy to button-first management actions
+
+### Fixed
+
+- Runtime callback rejection for payloads with negative channel IDs
+- Destination-scope publishing guard to block invalid/out-of-scope channel publish attempts
+- Scheduler fallback destination selection behavior that previously skipped explicit destination choice
+
+### Validation
+
+- `python3 -m py_compile` across project files: passed
+- Unit/integration tests (`unittest discover -s tests -v`): passed
+- Runtime simulation: setup wizard, workspace flows, callback routes, draft isolation, scheduler destination selection, manual generation, and scoped publishing: passed
+
 ## Flowza v1.0.3 - 2026-07-15
 
 ### Added

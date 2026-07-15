@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -30,4 +31,16 @@ def build_schedule_actions_keyboard(schedule_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton("⬅ Back", callback_data="scheduler:list")],
         [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")],
     ]
+    return InlineKeyboardMarkup(buttons)
+
+
+def build_schedule_destination_keyboard(channels: list[dict[str, Any]]) -> InlineKeyboardMarkup:
+    """Build destination picker keyboard for scheduling flow."""
+    buttons: list[list[InlineKeyboardButton]] = []
+    for channel in channels:
+        cid = int(channel.get("channel_id"))
+        title = channel.get("title") or channel.get("username") or f"Channel {cid}"
+        buttons.append([InlineKeyboardButton(title, callback_data=f"scheduler:dest:{cid}")])
+    buttons.append([InlineKeyboardButton("⬅ Back", callback_data="scheduler:schedule")])
+    buttons.append([InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")])
     return InlineKeyboardMarkup(buttons)

@@ -9,6 +9,7 @@ from handlers.channel import receive_channel
 from handlers.post import (
     receive_album,
     receive_animation,
+    receive_audio_voice_sticker,
     receive_document,
     receive_photo,
     receive_text,
@@ -39,6 +40,7 @@ from states import (
     WAITING_GIF,
     WAITING_PHOTO,
     WAITING_POST_ALBUM,
+    WAITING_POST_AUDIO,
     WAITING_POST_DOCUMENT,
     WAITING_POST_DOCUMENT_CAPTION,
     WAITING_POST_GIF,
@@ -48,6 +50,7 @@ from states import (
     WAITING_POST_TEXT,
     WAITING_POST_VIDEO,
     WAITING_POST_VIDEO_CAPTION,
+    WAITING_POST_VOICE,
     WAITING_SCHEDULE_CONFIRM,
     WAITING_SCHEDULE_DATE,
     WAITING_SCHEDULE_INTERVAL,
@@ -100,6 +103,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     post_state = context.user_data.get("post_state")
+    if post_state in {
+        WAITING_POST_TEXT,
+        WAITING_TEXT,
+        WAITING_POST_PHOTO,
+        WAITING_POST_PHOTO_CAPTION,
+        WAITING_PHOTO,
+        WAITING_POST_GIF,
+        WAITING_POST_GIF_CAPTION,
+        WAITING_GIF,
+        WAITING_POST_VIDEO,
+        WAITING_POST_VIDEO_CAPTION,
+        WAITING_VIDEO,
+        WAITING_POST_DOCUMENT,
+        WAITING_POST_DOCUMENT_CAPTION,
+        WAITING_DOCUMENT,
+        WAITING_POST_ALBUM,
+        WAITING_ALBUM,
+        WAITING_POST_AUDIO,
+        WAITING_POST_VOICE,
+    }:
+        handled = await receive_audio_voice_sticker(update, context)
+        if handled:
+            return
+
     if post_state in {WAITING_POST_TEXT, WAITING_TEXT}:
         await receive_text(update, context)
         return
@@ -117,6 +144,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     if post_state in {WAITING_POST_ALBUM, WAITING_ALBUM}:
         await receive_album(update, context)
+        return
+    if post_state in {WAITING_POST_AUDIO, WAITING_POST_VOICE}:
+        await update.effective_message.reply_text("❌ Please send the requested media type.")
         return
 
     if post_state == WAITING_SCHEDULE_DATE:

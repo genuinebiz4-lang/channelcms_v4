@@ -17,6 +17,7 @@ from handlers.channel import (
     set_default_channel,
 )
 from handlers.post import (
+    audio_post,
     album_post,
     delete_draft,
     document_post,
@@ -29,6 +30,7 @@ from handlers.post import (
     publish_to_channel,
     text_post,
     video_post,
+    voice_post,
 )
 from handlers.approval import (
     approval_approve_now_callback,
@@ -43,12 +45,25 @@ from handlers.workspace import (
     workspace_dashboard_callback,
     workspace_delete_no_callback,
     workspace_delete_yes_callback,
+    workspace_open_collections_callback,
+    workspace_open_create_callback,
+    workspace_open_list_callback,
+    workspace_open_media_callback,
+    workspace_open_switch_callback,
+    workspace_open_templates_callback,
     workspace_switch_callback,
+)
+from handlers.help_center import (
+    help_center_callback,
+    help_topic_callback,
+    manual_callback,
+    support_callback,
 )
 from handlers.commercial import (
     admin_menu_callback,
     editor_menu_callback,
     owner_menu_callback,
+    subscription_command,
     subscription_back_callback,
     subscription_copy_wallet_callback,
     subscription_payment_history_callback,
@@ -67,6 +82,7 @@ from handlers.scheduler import (
     pause_schedule,
     resume_schedule,
     schedule_post,
+    select_schedule_destination_callback,
     scheduler_dashboard,
 )
 from handlers.settings import settings_dashboard, toggle_approval_workflow
@@ -128,6 +144,46 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await workspace_dashboard_callback(update, context)
         return
 
+    if data == "workspace:open_create":
+        await safe_answer(query)
+        await workspace_open_create_callback(update, context)
+        return
+
+    if data == "workspace:open_list":
+        await safe_answer(query)
+        await workspace_open_list_callback(update, context)
+        return
+
+    if data == "workspace:open_switch":
+        await safe_answer(query)
+        await workspace_open_switch_callback(update, context)
+        return
+
+    if data == "workspace:open_collections":
+        await safe_answer(query)
+        await workspace_open_collections_callback(update, context)
+        return
+
+    if data == "workspace:open_media":
+        await safe_answer(query)
+        await workspace_open_media_callback(update, context)
+        return
+
+    if data == "workspace:open_templates":
+        await safe_answer(query)
+        await workspace_open_templates_callback(update, context)
+        return
+
+    if data in {"dashboard:media", "dashboard:collections", "dashboard:templates"}:
+        await safe_answer(query)
+        await workspace_dashboard_callback(update, context)
+        return
+
+    if data == "dashboard:team":
+        await safe_answer(query)
+        await admin_menu_callback(update, context)
+        return
+
     if data == "dashboard:posts":
         await safe_answer(query)
         await post_dashboard(update, context)
@@ -148,14 +204,65 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await owner_menu_callback(update, context)
         return
 
-    if data in {"dashboard:admin_analytics", "dashboard:admin_subscription"}:
+    if data == "dashboard:admin_analytics":
         await safe_answer(query)
         await admin_menu_callback(update, context)
+        return
+
+    if data == "dashboard:admin_subscription":
+        await safe_answer(query)
+        await subscription_command(update, context)
         return
 
     if data == "dashboard:editor_approval":
         await safe_answer(query)
         await editor_menu_callback(update, context)
+        return
+
+    if data == "dashboard:help":
+        await safe_answer(query)
+        await help_center_callback(update, context)
+        return
+
+    if data == "help:support":
+        await safe_answer(query)
+        await support_callback(update, context)
+        return
+
+    if data == "help:manual":
+        await safe_answer(query)
+        await manual_callback(update, context)
+        return
+
+    if data.startswith("help:"):
+        await safe_answer(query)
+        topic = data.removeprefix("help:")
+        await help_topic_callback(update, context, topic)
+        return
+
+    if data == "setup:create_workspace":
+        await safe_answer(query)
+        await workspace_dashboard_callback(update, context)
+        return
+
+    if data == "setup:add_destination":
+        await safe_answer(query)
+        await channel_dashboard(update, context)
+        return
+
+    if data == "setup:create_post":
+        await safe_answer(query)
+        await post_dashboard(update, context)
+        return
+
+    if data == "setup:publish":
+        await safe_answer(query)
+        await publish_post(update, context)
+        return
+
+    if data == "setup:complete":
+        await safe_answer(query)
+        await send_dashboard(update, context)
         return
 
     if data == "commercial:copy_wallet":
@@ -298,6 +405,16 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await document_post(update, context)
         return
 
+    if data == "post:audio":
+        await safe_answer(query)
+        await audio_post(update, context)
+        return
+
+    if data == "post:voice":
+        await safe_answer(query)
+        await voice_post(update, context)
+        return
+
     if data == "post:album":
         await safe_answer(query)
         await album_post(update, context)
@@ -405,6 +522,12 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if data.startswith("scheduler:delete:"):
         await safe_answer(query)
         await delete_schedule(update, context)
+        return
+
+    channel_id = _parse_callback_int(data, prefix="scheduler:dest:")
+    if channel_id is not None:
+        await safe_answer(query)
+        await select_schedule_destination_callback(update, context, channel_id)
         return
 
     await safe_answer(query, "Unsupported action.")

@@ -30,6 +30,7 @@ from database.drafts import (
 from keyboards.post import build_post_keyboard, build_preview_keyboard, build_publish_keyboard
 from states import (
     WAITING_POST_ALBUM,
+    WAITING_POST_AUDIO,
     WAITING_POST_DOCUMENT,
     WAITING_POST_DOCUMENT_CAPTION,
     WAITING_POST_GIF,
@@ -40,6 +41,7 @@ from states import (
     WAITING_POST_TEXT,
     WAITING_POST_VIDEO,
     WAITING_POST_VIDEO_CAPTION,
+    WAITING_POST_VOICE,
 )
 from utils.logger import get_logger
 from utils.permissions import can_compose_content, can_publish_content
@@ -73,25 +75,30 @@ async def _finalize_draft(
     logger_message: str,
 ) -> None:
     """Persist a draft, store the draft id, and move to preview."""
-    draft_id = context.user_data.get("draft_id")
-    if draft_id is not None:
-        await update_draft(int(draft_id), draft_type=draft_type, text=text, file_id=file_id, caption=caption, album=json.dumps(album) if album is not None else None)
+    # Always create a new draft item to avoid stale draft reuse across media uploads.
+    if draft_type == "text":
+        draft = await save_text(text or "")
+    elif draft_type == "photo":
+        draft = await save_photo(file_id or "", caption or None)
+    elif draft_type == "gif":
+        draft = await save_animation(file_id or "", caption or None)
+    elif draft_type == "video":
+        draft = await save_video(file_id or "", caption or None)
+    elif draft_type == "document":
+        draft = await save_document(file_id or "", caption or None)
+    elif draft_type == "audio":
+        draft = await save_document(file_id or "", caption or None)
+        if draft:
+            await update_draft(int(draft["id"]), draft_type="audio")
+    elif draft_type == "voice":
+        draft = await save_document(file_id or "", caption or None)
+        if draft:
+            await update_draft(int(draft["id"]), draft_type="voice")
+    elif draft_type == "album":
+        draft = await save_album([item["media"] for item in album or []], caption or None)
     else:
-        if draft_type == "text":
-            draft = await save_text(text or "")
-        elif draft_type == "photo":
-            draft = await save_photo(file_id or "", caption or None)
-        elif draft_type == "gif":
-            draft = await save_animation(file_id or "", caption or None)
-        elif draft_type == "video":
-            draft = await save_video(file_id or "", caption or None)
-        elif draft_type == "document":
-            draft = await save_document(file_id or "", caption or None)
-        elif draft_type == "album":
-            draft = await save_album([item["media"] for item in album or []], caption or None)
-        else:
-            draft = None
-        draft_id = draft["id"] if draft else None
+        draft = None
+    draft_id = draft["id"] if draft else None
 
     context.user_data["post_state"] = WAITING_POST_PREVIEW
     context.user_data["draft_id"] = draft_id
@@ -282,7 +289,74 @@ async def document_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     context.user_data["post_state"] = WAITING_POST_DOCUMENT
+    context.user_data.pop("draft_id", None)
     await _send_or_edit(update, "📄 Send a document to create a post draft.", keyboard=build_post_keyboard())
+
+
+async def audio_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start an audio post draft."""
+    if not await can_compose_content(update):
+        await _send_or_edit(update, "🚫 You do not have permission to create drafts.", answer_text="Access denied")
+        return
+
+    context.user_data["post_state"] = WAITING_POST_AUDIO
+    context.user_data.pop("draft_id", None)
+    await _send_or_edit(update, "🎵 Send an audio file to create a post draft.", keyboard=build_post_keyboard())
+
+
+async def voice_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start a voice post draft."""
+    if not await can_compose_content(update):
+        await _send_or_edit(update, "🚫 You do not have permission to create drafts.", answer_text="Access denied")
+        return
+
+    context.user_data["post_state"] = WAITING_POST_VOICE
+    context.user_data.pop("draft_id", None)
+    await _send_or_edit(update, "🎙 Send a voice note to create a post draft.", keyboard=build_post_keyboard())
+
+
+async def receive_audio_voice_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Handle audio/voice draft capture and sticker rejection across composer states."""
+    message = update.effective_message
+    if message is None:
+        return False
+
+    post_state = context.user_data.get("post_state")
+    if message.sticker:
+        await message.reply_text("❌ Stickers are not supported for publishing. Please send text or media.")
+        return True
+
+    if post_state == WAITING_POST_AUDIO and message.audio:
+        await _finalize_draft(
+            update,
+            context,
+            draft_type="audio",
+            file_id=str(message.audio.file_id),
+            caption=(message.caption or "").strip() or None,
+            success_message="🎵 Audio draft created. Preview it before publishing.",
+            logger_message="Draft created for audio post",
+        )
+        return True
+
+    if post_state == WAITING_POST_VOICE and message.voice:
+        await _finalize_draft(
+            update,
+            context,
+            draft_type="voice",
+            file_id=str(message.voice.file_id),
+            caption=(message.caption or "").strip() or None,
+            success_message="🎙 Voice draft created. Preview it before publishing.",
+            logger_message="Draft created for voice post",
+        )
+        return True
+
+    if post_state == WAITING_POST_AUDIO and not message.audio:
+        await message.reply_text("❌ Please send a valid audio file.")
+        return True
+    if post_state == WAITING_POST_VOICE and not message.voice:
+        await message.reply_text("❌ Please send a valid voice note.")
+        return True
+    return False
 
 
 async def receive_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -527,6 +601,20 @@ async def publish_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE,
             await context.bot.send_document(
                 chat_id=channel_id,
                 document=draft.get("file_id"),
+                caption=draft.get("caption"),
+                parse_mode=draft.get("parse_mode") or "HTML",
+            )
+        elif draft.get("draft_type") == "audio":
+            await context.bot.send_audio(
+                chat_id=channel_id,
+                audio=draft.get("file_id"),
+                caption=draft.get("caption"),
+                parse_mode=draft.get("parse_mode") or "HTML",
+            )
+        elif draft.get("draft_type") == "voice":
+            await context.bot.send_voice(
+                chat_id=channel_id,
+                voice=draft.get("file_id"),
                 caption=draft.get("caption"),
                 parse_mode=draft.get("parse_mode") or "HTML",
             )

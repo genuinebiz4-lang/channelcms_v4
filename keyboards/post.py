@@ -16,6 +16,8 @@ def build_post_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎞 GIF", callback_data="post:gif")],
         [InlineKeyboardButton("🎥 Video", callback_data="post:video")],
         [InlineKeyboardButton("📄 Document", callback_data="post:document")],
+        [InlineKeyboardButton("🎵 Audio", callback_data="post:audio")],
+        [InlineKeyboardButton("🎙 Voice", callback_data="post:voice")],
         [InlineKeyboardButton("🖼 Album", callback_data="post:album")],
         [InlineKeyboardButton("👀 Preview", callback_data="post:preview")],
         [InlineKeyboardButton("🚀 Publish", callback_data="post:publish")],

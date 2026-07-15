@@ -15,6 +15,8 @@ WAITING_POST_VIDEO = "waiting_post_video"
 WAITING_POST_VIDEO_CAPTION = "waiting_post_video_caption"
 WAITING_POST_DOCUMENT = "waiting_post_document"
 WAITING_POST_DOCUMENT_CAPTION = "waiting_post_document_caption"
+WAITING_POST_AUDIO = "waiting_post_audio"
+WAITING_POST_VOICE = "waiting_post_voice"
 WAITING_POST_ALBUM = "waiting_post_album"
 WAITING_POST_PREVIEW = "waiting_post_preview"
 

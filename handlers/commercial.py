@@ -123,39 +123,26 @@ async def subscription_command(update: Update, context: ContextTypes.DEFAULT_TYP
     admin_profile = await get_admin_profile(int(admin_id))
     trial_end = admin_profile.get("trial_end") if admin_profile else None
     sub = await get_subscription_view(int(admin_id), trial_end)
-    plans = await list_subscription_plans()
-
     current_plan = str(sub.get("plan_code") or "trial_45") if sub else "trial_45"
     trial_remaining = int(sub.get("days_remaining") or 0) if sub else 0
     expiry_date = str(sub.get("expiry_date") or "N/A") if sub else "N/A"
-    pricing_rows = [p for p in plans if int(p.get("is_trial") or 0) == 0]
-
     lines = [
         "💳 Flowza Pro",
-        "",
+        "━━━━━━━━━━━━━━",
         f"Current Plan: {current_plan}",
-        f"Trial Remaining: {trial_remaining} days",
-        f"Expiry Date: {expiry_date}",
-        "",
-        "Pricing:",
+        f"Expiry: {expiry_date}",
+        f"Remaining Days: {trial_remaining}",
+        "━━━━━━━━━━━━━━",
+        "Plans",
+        "28 Days — 10 USDT",
+        "84 Days — 25 USDT",
+        "365 Days — 90 USDT",
+        "━━━━━━━━━━━━━━",
+        "Network",
+        "USDT TRC20",
+        "Wallet",
+        f"{USDT_TRC20_WALLET or 'Not configured'}",
     ]
-    preferred_days = {28, 80, 365}
-    shown = set()
-    for row in pricing_rows:
-        days = int(row.get("duration_days") or 0)
-        if days in preferred_days:
-            shown.add(days)
-            lines.append(f"{days} Days: {row.get('price_usdt')} USDT")
-    for days in sorted(preferred_days - shown):
-        lines.append(f"{days} Days: check /plans")
-
-    lines.extend(
-        [
-            "",
-            "Payment Method: USDT TRC20",
-            f"Wallet Address: {USDT_TRC20_WALLET or 'Not configured'}",
-        ]
-    )
     await update.effective_message.reply_text("\n".join(lines), reply_markup=build_subscription_keyboard())
 
 

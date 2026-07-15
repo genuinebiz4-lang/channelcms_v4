@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 from database.channels import (
     add_channel,
@@ -383,3 +383,19 @@ async def remove_channel_confirm(
         return
 
     await _send_or_edit(update, "Unable to remove that channel.", keyboard=build_channel_manager_keyboard())
+
+
+async def channels_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Fallback command to open destination dashboard."""
+    await channel_dashboard(update, context)
+
+
+async def add_channel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Fallback command to enter add destination flow."""
+    await add_channel_menu(update, context)
+
+
+def register_channel_handlers(application: Application) -> None:
+    """Register destination command fallbacks."""
+    application.add_handler(CommandHandler("channels", channels_command))
+    application.add_handler(CommandHandler("addchannel", add_channel_command))

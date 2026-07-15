@@ -20,10 +20,12 @@ from database.scheduler import initialize as initialize_scheduler_db
 from database.settings import initialize as initialize_settings_db
 from handlers.commercial import global_error_handler, register_commercial_handlers
 from handlers.analytics import register_analytics_handlers
+from handlers.channel import register_channel_handlers
 from handlers.notifications import register_notification_handlers
 from handlers.approval import register_approval_handlers
 from handlers.provisioning import register_provisioning_handlers
 from handlers.workspace import register_workspace_handlers
+from handlers.help_center import register_help_center_handlers
 from handlers.scheduler import initialize_scheduler, retry_stats_command, shutdown_scheduler
 from handlers.start import register_start_handler
 from routers.callback_router import handle_callback
@@ -44,6 +46,8 @@ def build_application() -> object | None:
     register_provisioning_handlers(application)
     register_approval_handlers(application)
     register_workspace_handlers(application)
+    register_channel_handlers(application)
+    register_help_center_handlers(application)
     register_commercial_handlers(application)
     register_analytics_handlers(application)
     register_notification_handlers(application)

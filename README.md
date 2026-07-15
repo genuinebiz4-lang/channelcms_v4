@@ -8,6 +8,8 @@ Grow.
 
 Version: Flowza v1.0.3
 
+Release Stage: Release Candidate (RC)
+
 ## About
 
 Flowza is a Telegram Content Management System designed to centralize destination management, post composition, drafting, and scheduling in one operational workflow.
@@ -26,6 +28,7 @@ Target users:
 
 - ✔ Destination Manager (channel destinations currently implemented)
 - ✔ Post Composer (text, photo, GIF/animation, video, document, album)
+- ✔ Post Composer Extensions (audio, voice, sticker rejection safety)
 - ✔ Draft System (save, preview, edit, delete latest draft)
 - ✔ Scheduler (one-time and recurring schedules)
 - ✔ RBAC Foundation (Owner/Admin/Editor role model)
@@ -48,6 +51,11 @@ Target users:
 - ✔ Automated Backup Jobs (daily/weekly zip backups plus manual backup command)
 - ✔ Global Error Reporting (error UID capture and owner alerting)
 - ✔ Settings Dashboard (role and approval status)
+- ✔ Button-First Dashboard Navigation (Back + Dashboard controls across modules)
+- ✔ First-Run Setup Wizard (Create Workspace → Add Destination → Create Post → Publish)
+- ✔ Help Center (guided sections, FAQ, troubleshooting, support)
+- ✔ PDF User Manual generation and download
+- ✔ Support Contact panel with Telegram deep-link
 - ✔ Structured Logging
 - ✔ SQLite Database Layer
 - ✔ Telegram Dashboard Navigation

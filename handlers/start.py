@@ -6,10 +6,13 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from config import APP_TITLE, VERSION
+from database.settings import get_admin_for_user
+from database.workspace import get_current_workspace
 from keyboards.dashboard import (
     build_admin_dashboard_keyboard,
     build_dashboard_keyboard,
     build_editor_dashboard_keyboard,
+    build_first_run_keyboard,
     build_owner_dashboard_keyboard,
 )
 from utils.logger import get_logger
@@ -28,12 +31,38 @@ async def send_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Render role-aware dashboard for command and callback entry points."""
     del context
     role = await get_request_role(update)
+
+    user = update.effective_user
+    if user is None:
+        return
+
+    if role == ROLE_ADMIN:
+        admin_id = await get_admin_for_user(user.id)
+        current_workspace = await get_current_workspace(user.id, int(admin_id)) if admin_id is not None else None
+        if current_workspace is None:
+            message = (
+                f"🚀 {APP_TITLE} Setup Wizard\n\n"
+                "Welcome to Flowza. Complete these steps to go live:\n"
+                "1. Create Workspace\n"
+                "2. Add Destination\n"
+                "3. Create First Post\n"
+                "4. Publish\n\n"
+                f"Version: {VERSION}"
+            )
+            keyboard = build_first_run_keyboard()
+            query = update.callback_query
+            if query is not None:
+                await query.answer()
+                await safe_edit_message(query, message, reply_markup=keyboard)
+            else:
+                await update.effective_message.reply_text(message, reply_markup=keyboard)
+            logger.info("Handled /start setup wizard for user %s", user.id)
+            return
+
     message = (
-        f"🚀 {APP_TITLE}\n\n"
-        "Professional Telegram Content Management System\n\n"
-        "Automate.\n"
-        "Schedule.\n"
-        "Grow.\n\n"
+        "🚀 Flowza Dashboard\n\n"
+        "Commercial Telegram Content Platform\n\n"
+        "Navigate with buttons below.\n"
         f"Version: {VERSION}"
     )
     if role == ROLE_OWNER:

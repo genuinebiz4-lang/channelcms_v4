@@ -5,6 +5,22 @@ from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
+def build_workspace_manager_keyboard() -> InlineKeyboardMarkup:
+    """Build workspace module action keyboard."""
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("➕ Create Workspace", callback_data="workspace:open_create")],
+            [InlineKeyboardButton("📋 Workspaces", callback_data="workspace:open_list")],
+            [InlineKeyboardButton("🔁 Switch Workspace", callback_data="workspace:open_switch")],
+            [InlineKeyboardButton("📂 Collections", callback_data="workspace:open_collections")],
+            [InlineKeyboardButton("🖼 Media Library", callback_data="workspace:open_media")],
+            [InlineKeyboardButton("📝 Templates", callback_data="workspace:open_templates")],
+            [InlineKeyboardButton("⬅ Back", callback_data="dashboard:home")],
+            [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")],
+        ]
+    )
+
+
 def build_workspace_list_keyboard(workspaces: list[dict], current_workspace_id: int | None) -> InlineKeyboardMarkup:
     """Build workspace selection keyboard with breadcrumbs."""
     rows: list[list[InlineKeyboardButton]] = []

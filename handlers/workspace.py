@@ -41,6 +41,7 @@ from database.workspace import (
 from handlers.post import publish_to_channel
 from keyboards.workspace import (
     build_collection_delete_confirm_keyboard,
+    build_workspace_manager_keyboard,
     build_workspace_delete_confirm_keyboard,
     build_workspace_list_keyboard,
 )
@@ -59,15 +60,49 @@ async def workspace_dashboard_callback(update: Update, context: ContextTypes.DEF
         return
     await safe_edit_message(
         query,
-        "🧭 Workspace Manager\n\n"
-        "Use commands:\n"
-        "/createworkspace\n"
-        "/workspaces\n"
-        "/switchworkspace\n"
-        "/createcollection\n"
-        "/media\n"
-        "/templates"
+        "🏢 Workspace Manager\n\n"
+        "Use buttons to manage workspaces, collections, media, and templates.\n"
+        "Typing is only required for names or search inputs.",
+        reply_markup=build_workspace_manager_keyboard(),
     )
+
+
+async def workspace_open_create_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Open create-workspace prompt from button-first workspace menu."""
+    query = update.callback_query
+    if query is None:
+        return
+    context.user_data["workspace_state"] = WAITING_WORKSPACE_NAME
+    await safe_edit_message(
+        query,
+        "Send workspace name now.\nOptional format: Workspace Name | description",
+        reply_markup=build_workspace_manager_keyboard(),
+    )
+
+
+async def workspace_open_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Open workspace list from callback route."""
+    await workspaces_command(update, context)
+
+
+async def workspace_open_switch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show workspace list and switch guidance from callback route."""
+    await workspaces_command(update, context)
+
+
+async def workspace_open_collections_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Render collection summary from callback route."""
+    await collections_command(update, context)
+
+
+async def workspace_open_media_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Render media summary from callback route."""
+    await media_command(update, context)
+
+
+async def workspace_open_templates_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Render templates summary from callback route."""
+    await templates_command(update, context)
 
 
 def _split_pipe(text: str) -> list[str]:

@@ -20,8 +20,6 @@ from database.channels import (
     get_channel,
     get_channels,
     get_channels_for_admin,
-    get_default_channel,
-    get_default_channel_for_admin,
 )
 from database.drafts import get_draft, get_latest
 from database.enterprise import (
@@ -49,7 +47,11 @@ from database.scheduler import (
 from database.settings import get_admin_for_user
 from database.workspace import get_current_workspace
 from handlers.commercial import run_daily_commercial_jobs, run_scheduled_backup
-from keyboards.scheduler import build_schedule_actions_keyboard, build_scheduler_keyboard
+from keyboards.scheduler import (
+    build_schedule_actions_keyboard,
+    build_schedule_destination_keyboard,
+    build_scheduler_keyboard,
+)
 from states import (
     WAITING_SCHEDULE_CONFIRM,
     WAITING_SCHEDULE_DATE,
@@ -286,15 +288,19 @@ async def confirm_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     if channel_id is None:
-        if admin_id is not None:
-            default_channel = await get_default_channel_for_admin(int(admin_id))
+        query = update.callback_query
+        if query is not None:
+            await safe_edit_message(
+                query,
+                "📢 Select destination for scheduled post.",
+                reply_markup=build_schedule_destination_keyboard(channels),
+            )
         else:
-            default_channel = await get_default_channel()
-        if default_channel is not None:
-            channel_id = int(default_channel["channel_id"])
-        else:
-            channel_id = int(channels[0]["channel_id"])
-        context.user_data["schedule_channel_id"] = channel_id
+            await message.reply_text(
+                "📢 Select destination for scheduled post.",
+                reply_markup=build_schedule_destination_keyboard(channels),
+            )
+        return
 
     cron_expression = None
     if schedule_type == "daily":
@@ -399,6 +405,28 @@ async def list_schedules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"\n#{schedule['id']} | {draft.get('draft_type') if draft else 'unknown'} | {channel.get('title') if channel else 'unknown'} | {schedule.get('schedule_type')} | {schedule.get('next_run')} | {schedule.get('status')}"
         )
     await _send_or_edit(update, "\n".join(lines), keyboard=build_schedule_actions_keyboard(int(schedules[0]["id"])))
+
+
+async def select_schedule_destination_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, channel_id: int) -> None:
+    """Set destination during scheduling flow and continue confirmation."""
+    if not await can_manage_schedule(update):
+        await _send_or_edit(update, "🚫 You do not have permission to manage schedules.", answer_text="Access denied")
+        return
+
+    query = update.callback_query
+    user = update.effective_user
+    if query is None or user is None:
+        return
+
+    admin_id = await get_admin_for_user(user.id)
+    if admin_id is not None:
+        allowed = {int(c["channel_id"]) for c in await get_channels_for_admin(int(admin_id))}
+        if int(channel_id) not in allowed:
+            await query.answer("Destination not in your scope", show_alert=True)
+            return
+
+    context.user_data["schedule_channel_id"] = int(channel_id)
+    await confirm_schedule(update, context)
 
 
 async def pause_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -718,6 +746,10 @@ async def _publish_draft(application: Any, channel_id: int, draft: dict[str, Any
         await application.bot.send_video(chat_id=channel_id, video=draft.get("file_id"), caption=draft.get("caption"), parse_mode=draft.get("parse_mode") or "HTML")
     elif draft.get("draft_type") == "document":
         await application.bot.send_document(chat_id=channel_id, document=draft.get("file_id"), caption=draft.get("caption"), parse_mode=draft.get("parse_mode") or "HTML")
+    elif draft.get("draft_type") == "audio":
+        await application.bot.send_audio(chat_id=channel_id, audio=draft.get("file_id"), caption=draft.get("caption"), parse_mode=draft.get("parse_mode") or "HTML")
+    elif draft.get("draft_type") == "voice":
+        await application.bot.send_voice(chat_id=channel_id, voice=draft.get("file_id"), caption=draft.get("caption"), parse_mode=draft.get("parse_mode") or "HTML")
     elif draft.get("draft_type") == "album":
         album_items = json.loads(draft.get("album") or "[]")
         if album_items:
