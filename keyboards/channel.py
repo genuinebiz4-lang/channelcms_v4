@@ -18,7 +18,8 @@ def build_channel_manager_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("⭐ Default Destination", callback_data="channel:default_menu")],
         [InlineKeyboardButton("🗑 Remove Destination", callback_data="channel:remove_menu")],
         [InlineKeyboardButton("🔄 Refresh", callback_data="channel:refresh")],
-        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:channels")],
+        [InlineKeyboardButton("⬅ Back", callback_data="dashboard:home")],
+        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")],
     ]
     return InlineKeyboardMarkup(buttons)
 
@@ -33,7 +34,8 @@ def build_channel_selection_keyboard(
         label = channel.get("title") or channel.get("username") or f"Channel {channel.get('channel_id')}"
         callback_data = f"{callback_prefix}:{channel['channel_id']}"
         buttons.append([InlineKeyboardButton(label, callback_data=callback_data)])
-    buttons.append([InlineKeyboardButton("◀️ Back", callback_data="channel:dashboard")])
+    buttons.append([InlineKeyboardButton("⬅ Back", callback_data="channel:dashboard")])
+    buttons.append([InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")])
     return InlineKeyboardMarkup(buttons)
 
 
@@ -41,6 +43,7 @@ def build_remove_confirmation_keyboard(channel_id: int) -> InlineKeyboardMarkup:
     """Create the confirmation keyboard for channel removal."""
     buttons = [
         [InlineKeyboardButton("✅ Yes", callback_data=f"channel:remove_yes:{channel_id}")],
-        [InlineKeyboardButton("❌ No", callback_data="channel:dashboard")],
+        [InlineKeyboardButton("⬅ Back", callback_data="channel:dashboard")],
+        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")],
     ]
     return InlineKeyboardMarkup(buttons)

@@ -282,24 +282,28 @@ async def list_admin_profiles() -> list[dict[str, Any]]:
     return await asyncio.to_thread(_list)
 
 
-async def assign_destination_owner(channel_id: int, admin_id: int) -> None:
+async def assign_destination_owner(channel_id: int, admin_id: int) -> bool:
     """Assign destination ownership to an admin."""
 
-    def _assign() -> None:
+    def _assign() -> bool:
         with get_connection() as connection:
-            connection.execute(
-                """
-                INSERT INTO destination_owners (channel_id, admin_id, updated_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(channel_id) DO UPDATE SET
-                    admin_id = excluded.admin_id,
-                    updated_at = excluded.updated_at
-                """,
-                (channel_id, admin_id, _utc_now().isoformat()),
-            )
-            connection.commit()
+            try:
+                connection.execute(
+                    """
+                    INSERT INTO destination_owners (channel_id, admin_id, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(channel_id) DO UPDATE SET
+                        admin_id = excluded.admin_id,
+                        updated_at = excluded.updated_at
+                    """,
+                    (channel_id, admin_id, _utc_now().isoformat()),
+                )
+                connection.commit()
+                return True
+            except Exception:
+                return False
 
-    await asyncio.to_thread(_assign)
+    return await asyncio.to_thread(_assign)
 
 
 async def transfer_destination_owner(channel_id: int, new_admin_id: int, actor_id: int) -> bool:

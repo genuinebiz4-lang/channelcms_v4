@@ -16,5 +16,6 @@ def build_settings_keyboard(approval_required: bool, can_toggle: bool) -> Inline
 	]
 	if can_toggle:
 		buttons.append([InlineKeyboardButton("Toggle Approval Workflow", callback_data="settings:toggle_approval")])
-	buttons.append([InlineKeyboardButton("Back to Dashboard", callback_data="dashboard:settings")])
+	buttons.append([InlineKeyboardButton("⬅ Back", callback_data="dashboard:home")])
+	buttons.append([InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")])
 	return InlineKeyboardMarkup(buttons)

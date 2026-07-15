@@ -21,7 +21,8 @@ def build_post_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🚀 Publish", callback_data="post:publish")],
         [InlineKeyboardButton("✏ Edit Draft", callback_data="post:edit")],
         [InlineKeyboardButton("🗑 Delete Draft", callback_data="post:delete")],
-        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:channels")],
+        [InlineKeyboardButton("⬅ Back", callback_data="dashboard:home")],
+        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")],
     ]
     return InlineKeyboardMarkup(buttons)
 
@@ -31,7 +32,8 @@ def build_publish_keyboard(channel_ids: list[int]) -> InlineKeyboardMarkup:
     buttons: list[list[InlineKeyboardButton]] = []
     for channel_id in channel_ids:
         buttons.append([InlineKeyboardButton(f"Channel {channel_id}", callback_data=f"post:channel:{channel_id}")])
-    buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="post:dashboard")])
+    buttons.append([InlineKeyboardButton("⬅ Back", callback_data="post:dashboard")])
+    buttons.append([InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")])
     return InlineKeyboardMarkup(buttons)
 
 
@@ -42,6 +44,7 @@ def build_preview_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🚀 Publish", callback_data="post:publish")],
         [InlineKeyboardButton("✏ Edit Draft", callback_data="post:edit")],
         [InlineKeyboardButton("🗑 Delete Draft", callback_data="post:delete")],
-        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:channels")],
+        [InlineKeyboardButton("⬅ Back", callback_data="post:dashboard")],
+        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")],
     ]
     return InlineKeyboardMarkup(buttons)

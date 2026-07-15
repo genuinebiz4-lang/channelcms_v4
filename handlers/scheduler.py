@@ -16,7 +16,13 @@ from telegram.ext import ContextTypes
 
 from config import OWNER_ID, TIMEZONE
 from database.approval import mark_published_for_draft
-from database.channels import get_channel, get_channels, get_default_channel
+from database.channels import (
+    get_channel,
+    get_channels,
+    get_channels_for_admin,
+    get_default_channel,
+    get_default_channel_for_admin,
+)
 from database.drafts import get_draft, get_latest
 from database.enterprise import (
     create_notification,
@@ -271,12 +277,19 @@ async def confirm_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     channels = await get_channels()
+    user = update.effective_user
+    admin_id = await get_admin_for_user(user.id) if user else None
+    if admin_id is not None:
+        channels = await get_channels_for_admin(int(admin_id))
     if not channels:
         await message.reply_text("❌ No channel exists for scheduling.")
         return
 
     if channel_id is None:
-        default_channel = await get_default_channel()
+        if admin_id is not None:
+            default_channel = await get_default_channel_for_admin(int(admin_id))
+        else:
+            default_channel = await get_default_channel()
         if default_channel is not None:
             channel_id = int(default_channel["channel_id"])
         else:
@@ -308,8 +321,6 @@ async def confirm_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             f"⚠ Schedule conflict detected with schedule IDs: {', '.join(str(i) for i in conflict_ids)}. Saving anyway with lower priority."
         )
 
-    user = update.effective_user
-    admin_id = await get_admin_for_user(user.id) if user else None
     workspace_id = None
     timezone_name = TIMEZONE
     if user and admin_id is not None:

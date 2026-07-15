@@ -34,6 +34,16 @@ def _initialize_sync() -> None:
             );
             """
         )
+        columns = {
+            str(row["name"]).strip().lower()
+            for row in connection.execute("PRAGMA table_info(channels)").fetchall()
+        }
+        if "description" not in columns:
+            connection.execute("ALTER TABLE channels ADD COLUMN description TEXT")
+        if "member_count" not in columns:
+            connection.execute("ALTER TABLE channels ADD COLUMN member_count INTEGER DEFAULT 0")
+        connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_channels_channel_id ON channels(channel_id)")
+        connection.commit()
 
 
 async def initialize() -> None:
@@ -95,10 +105,15 @@ async def delete_channel(channel_id: int) -> bool:
 
     def _delete() -> int:
         with get_connection() as connection:
+            connection.execute(
+                "DELETE FROM destination_owners WHERE channel_id = ?",
+                (channel_id,),
+            )
             cursor = connection.execute(
                 "DELETE FROM channels WHERE channel_id = ?",
                 (channel_id,),
             )
+            connection.commit()
             return cursor.rowcount
 
     return bool(await asyncio.to_thread(_delete))
@@ -184,12 +199,63 @@ async def get_channels() -> list[dict[str, Any]]:
     return await asyncio.to_thread(_get_all)
 
 
+async def get_channels_for_admin(admin_id: int) -> list[dict[str, Any]]:
+    """Return channels owned by one admin."""
+
+    def _get_all() -> list[dict[str, Any]]:
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT c.*
+                FROM channels c
+                JOIN destination_owners d ON d.channel_id = c.channel_id
+                WHERE d.admin_id = ?
+                ORDER BY c.title COLLATE NOCASE ASC, c.id ASC
+                """,
+                (admin_id,),
+            ).fetchall()
+            return [_row_to_dict(row) for row in rows]
+
+    return await asyncio.to_thread(_get_all)
+
+
 async def set_default_channel(channel_id: int) -> bool:
     """Set a single channel as the default channel."""
 
     def _set_default() -> bool:
         with get_connection() as connection:
             connection.execute("UPDATE channels SET is_default = 0")
+            cursor = connection.execute(
+                "UPDATE channels SET is_default = 1 WHERE channel_id = ?",
+                (channel_id,),
+            )
+            connection.commit()
+            return cursor.rowcount > 0
+
+    return await asyncio.to_thread(_set_default)
+
+
+async def set_default_channel_for_admin(channel_id: int, admin_id: int) -> bool:
+    """Set default channel within one admin scope."""
+
+    def _set_default() -> bool:
+        with get_connection() as connection:
+            owned = connection.execute(
+                "SELECT 1 FROM destination_owners WHERE channel_id = ? AND admin_id = ?",
+                (channel_id, admin_id),
+            ).fetchone()
+            if owned is None:
+                return False
+            connection.execute(
+                """
+                UPDATE channels
+                SET is_default = 0
+                WHERE channel_id IN (
+                    SELECT channel_id FROM destination_owners WHERE admin_id = ?
+                )
+                """,
+                (admin_id,),
+            )
             cursor = connection.execute(
                 "UPDATE channels SET is_default = 1 WHERE channel_id = ?",
                 (channel_id,),
@@ -213,12 +279,51 @@ async def get_default_channel() -> dict[str, Any] | None:
     return await asyncio.to_thread(_get_default)
 
 
+async def get_default_channel_for_admin(admin_id: int) -> dict[str, Any] | None:
+    """Return default channel for one admin scope."""
+
+    def _get_default() -> dict[str, Any] | None:
+        with get_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT c.*
+                FROM channels c
+                JOIN destination_owners d ON d.channel_id = c.channel_id
+                WHERE d.admin_id = ? AND c.is_default = 1
+                LIMIT 1
+                """,
+                (admin_id,),
+            ).fetchone()
+            return None if row is None else _row_to_dict(row)
+
+    return await asyncio.to_thread(_get_default)
+
+
 async def total_channels() -> int:
     """Return the total number of saved channels."""
 
     def _count() -> int:
         with get_connection() as connection:
             row = connection.execute("SELECT COUNT(*) AS count FROM channels").fetchone()
+            return int(row["count"]) if row else 0
+
+    return await asyncio.to_thread(_count)
+
+
+async def total_channels_for_admin(admin_id: int) -> int:
+    """Return destination count for one admin scope."""
+
+    def _count() -> int:
+        with get_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM destination_owners d
+                JOIN channels c ON c.channel_id = d.channel_id
+                WHERE d.admin_id = ?
+                """,
+                (admin_id,),
+            ).fetchone()
             return int(row["count"]) if row else 0
 
     return await asyncio.to_thread(_count)

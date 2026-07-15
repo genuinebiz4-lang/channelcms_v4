@@ -14,12 +14,18 @@ from keyboards.dashboard import (
 )
 from utils.logger import get_logger
 from utils.permissions import ROLE_ADMIN, ROLE_EDITOR, ROLE_OWNER, get_request_role
+from utils.telegram_safety import safe_edit_message
 
 logger = get_logger(__name__)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send the startup dashboard to the user."""
+    await send_dashboard(update, context)
+
+
+async def send_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Render role-aware dashboard for command and callback entry points."""
     del context
     role = await get_request_role(update)
     message = (
@@ -38,7 +44,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         keyboard = build_editor_dashboard_keyboard()
     else:
         keyboard = build_dashboard_keyboard()
-    await update.effective_message.reply_text(message, reply_markup=keyboard)
+    query = update.callback_query
+    if query is not None:
+        await query.answer()
+        await safe_edit_message(query, message, reply_markup=keyboard)
+    else:
+        await update.effective_message.reply_text(message, reply_markup=keyboard)
     logger.info("Handled /start for user %s", update.effective_user.id)
 
 

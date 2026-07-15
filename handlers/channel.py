@@ -10,13 +10,14 @@ from database.channels import (
     channel_exists,
     delete_channel,
     get_channel,
-    get_channels,
-    get_default_channel,
-    set_default_channel as persist_default_channel,
-    total_channels,
+    get_channels_for_admin,
+    get_default_channel_for_admin,
+    set_default_channel_for_admin,
+    total_channels_for_admin,
 )
 from database.provisioning import assign_destination_owner
 from database.settings import get_admin_for_user
+from database.workspace import get_current_workspace
 from keyboards.channel import (
     build_channel_manager_keyboard,
     build_channel_selection_keyboard,
@@ -53,10 +54,28 @@ async def channel_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await _send_or_edit(update, "🚫 Only Admin accounts can manage destinations.", answer_text="Access denied")
         return
 
-    default_channel = await get_default_channel()
+    user = update.effective_user
+    if user is None:
+        return
+
+    admin_scope = await get_admin_for_user(user.id)
+    if admin_scope is None:
+        await _send_or_edit(update, "No admin workspace scope found. Create an admin profile first.")
+        return
+
+    current_workspace = await get_current_workspace(user.id, admin_scope)
+    if current_workspace is None:
+        await _send_or_edit(
+            update,
+            "No workspace selected yet. Create one with /createworkspace or switch with /switchworkspace.",
+        )
+        return
+
+    default_channel = await get_default_channel_for_admin(admin_scope)
     text = (
         "📢 Destination Manager\n\n"
-        f"Total Channels: {await total_channels()}\n"
+        f"Workspace: {current_workspace.get('workspace_name')} (#{current_workspace.get('workspace_id')})\n"
+        f"Total Channels: {await total_channels_for_admin(admin_scope)}\n"
         f"Default Channel: {default_channel.get('title') if default_channel else 'None'}\n\n"
         "Use the buttons below to add, review, or manage your destinations."
     )
@@ -67,6 +86,24 @@ async def add_channel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """Ask the user to forward a message from a channel."""
     if not await can_manage_destinations(update):
         await _send_or_edit(update, "🚫 Only Admin accounts can add destinations.", answer_text="Access denied")
+        return
+
+    user = update.effective_user
+    if user is None:
+        return
+
+    admin_scope = await get_admin_for_user(user.id)
+    if admin_scope is None:
+        await _send_or_edit(update, "No admin workspace scope found.")
+        return
+
+    current_workspace = await get_current_workspace(user.id, admin_scope)
+    if current_workspace is None:
+        await _send_or_edit(
+            update,
+            "No workspace selected. Use /createworkspace or /switchworkspace first.",
+            keyboard=build_channel_manager_keyboard(),
+        )
         return
 
     context.user_data["channel_state"] = WAITING_CHANNEL_FORWARD
@@ -143,7 +180,7 @@ async def receive_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except Exception:
         invite_link = None
 
-    await add_channel(
+    created = await add_channel(
         channel_id=channel_id,
         title=title,
         username=username,
@@ -151,12 +188,25 @@ async def receive_channel(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         description=description,
         member_count=member_count,
     )
+    if created is None:
+        context.user_data.pop("channel_state", None)
+        await message.reply_text("❌ Failed to save this destination. Please retry.")
+        return
 
     actor = update.effective_user
     if actor is not None:
         admin_scope = await get_admin_for_user(actor.id)
-        if admin_scope is not None:
-            await assign_destination_owner(channel_id, admin_scope)
+        if admin_scope is None:
+            await delete_channel(channel_id)
+            context.user_data.pop("channel_state", None)
+            await message.reply_text("❌ Admin scope not found, destination was not saved.")
+            return
+        mapped = await assign_destination_owner(channel_id, admin_scope)
+        if not mapped:
+            await delete_channel(channel_id)
+            context.user_data.pop("channel_state", None)
+            await message.reply_text("❌ Failed to map destination ownership. Please retry.")
+            return
 
     context.user_data.pop("channel_state", None)
     logger.info("Channel added: %s", channel_id)
@@ -174,9 +224,18 @@ async def list_channels(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await _send_or_edit(update, "🚫 Only Admin accounts can view destinations.", answer_text="Access denied")
         return
 
-    channels = await get_channels()
-    default_channel = await get_default_channel()
-    total = await total_channels()
+    user = update.effective_user
+    if user is None:
+        return
+
+    admin_scope = await get_admin_for_user(user.id)
+    if admin_scope is None:
+        await _send_or_edit(update, "No admin workspace scope found.", keyboard=build_channel_manager_keyboard())
+        return
+
+    channels = await get_channels_for_admin(admin_scope)
+    default_channel = await get_default_channel_for_admin(admin_scope)
+    total = await total_channels_for_admin(admin_scope)
     default_label = default_channel.get("title") if default_channel else "None"
 
     if not channels:
@@ -202,7 +261,16 @@ async def default_channel_menu(update: Update, context: ContextTypes.DEFAULT_TYP
         await _send_or_edit(update, "🚫 Only Admin accounts can change the default destination.", answer_text="Access denied")
         return
 
-    channels = await get_channels()
+    user = update.effective_user
+    if user is None:
+        return
+
+    admin_scope = await get_admin_for_user(user.id)
+    if admin_scope is None:
+        await _send_or_edit(update, "No admin workspace scope found.", keyboard=build_channel_manager_keyboard())
+        return
+
+    channels = await get_channels_for_admin(admin_scope)
     if not channels:
         await _send_or_edit(update, "No channels available yet.", keyboard=build_channel_manager_keyboard())
         return
@@ -221,7 +289,16 @@ async def set_default_channel(update: Update, context: ContextTypes.DEFAULT_TYPE
         await _send_or_edit(update, "🚫 Only Admin accounts can change the default destination.", answer_text="Access denied")
         return
 
-    success = await persist_default_channel(channel_id)
+    user = update.effective_user
+    if user is None:
+        return
+
+    admin_scope = await get_admin_for_user(user.id)
+    if admin_scope is None:
+        await _send_or_edit(update, "No admin workspace scope found.", keyboard=build_channel_manager_keyboard())
+        return
+
+    success = await set_default_channel_for_admin(channel_id, admin_scope)
     channel = await get_channel(channel_id)
     if success and channel:
         title = channel.get("title") or channel.get("username") or f"Channel {channel_id}"
@@ -238,7 +315,16 @@ async def remove_channel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         await _send_or_edit(update, "🚫 Only Admin accounts can remove destinations.", answer_text="Access denied")
         return
 
-    channels = await get_channels()
+    user = update.effective_user
+    if user is None:
+        return
+
+    admin_scope = await get_admin_for_user(user.id)
+    if admin_scope is None:
+        await _send_or_edit(update, "No admin workspace scope found.", keyboard=build_channel_manager_keyboard())
+        return
+
+    channels = await get_channels_for_admin(admin_scope)
     if not channels:
         await _send_or_edit(update, "No channels available to remove.", keyboard=build_channel_manager_keyboard())
         return
@@ -265,6 +351,20 @@ async def remove_channel_confirm(
     channel = await get_channel(channel_id)
     if channel is None:
         await _send_or_edit(update, "That channel was not found.", keyboard=build_channel_manager_keyboard())
+        return
+
+    user = update.effective_user
+    if user is None:
+        return
+
+    admin_scope = await get_admin_for_user(user.id)
+    if admin_scope is None:
+        await _send_or_edit(update, "No admin workspace scope found.", keyboard=build_channel_manager_keyboard())
+        return
+
+    admin_channels = {int(item["channel_id"]) for item in await get_channels_for_admin(admin_scope)}
+    if channel_id not in admin_channels:
+        await _send_or_edit(update, "That destination is outside your scope.", keyboard=build_channel_manager_keyboard())
         return
 
     if not confirmed:

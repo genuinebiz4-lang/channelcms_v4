@@ -36,6 +36,7 @@ from database.commercial import (
 from database.enterprise import create_notification, log_audit, run_maintenance
 from database.provisioning import get_admin_profile, list_admin_profiles
 from database.settings import get_admin_for_user
+from keyboards.commercial import build_subscription_keyboard
 from utils.logger import get_logger
 from utils.permissions import ROLE_ADMIN, get_request_role, is_owner
 from utils.rate_limit import enforce_rate_limit
@@ -122,8 +123,114 @@ async def subscription_command(update: Update, context: ContextTypes.DEFAULT_TYP
     admin_profile = await get_admin_profile(int(admin_id))
     trial_end = admin_profile.get("trial_end") if admin_profile else None
     sub = await get_subscription_view(int(admin_id), trial_end)
-    payments = await get_payment_history(int(admin_id), limit=10)
-    await update.effective_message.reply_text(_format_subscription(sub, payments))
+    plans = await list_subscription_plans()
+
+    current_plan = str(sub.get("plan_code") or "trial_45") if sub else "trial_45"
+    trial_remaining = int(sub.get("days_remaining") or 0) if sub else 0
+    expiry_date = str(sub.get("expiry_date") or "N/A") if sub else "N/A"
+    pricing_rows = [p for p in plans if int(p.get("is_trial") or 0) == 0]
+
+    lines = [
+        "💳 Flowza Pro",
+        "",
+        f"Current Plan: {current_plan}",
+        f"Trial Remaining: {trial_remaining} days",
+        f"Expiry Date: {expiry_date}",
+        "",
+        "Pricing:",
+    ]
+    preferred_days = {28, 80, 365}
+    shown = set()
+    for row in pricing_rows:
+        days = int(row.get("duration_days") or 0)
+        if days in preferred_days:
+            shown.add(days)
+            lines.append(f"{days} Days: {row.get('price_usdt')} USDT")
+    for days in sorted(preferred_days - shown):
+        lines.append(f"{days} Days: check /plans")
+
+    lines.extend(
+        [
+            "",
+            "Payment Method: USDT TRC20",
+            f"Wallet Address: {USDT_TRC20_WALLET or 'Not configured'}",
+        ]
+    )
+    await update.effective_message.reply_text("\n".join(lines), reply_markup=build_subscription_keyboard())
+
+
+async def subscription_copy_wallet_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Return wallet address in copy-friendly format."""
+    del context
+    query = update.callback_query
+    if query is None:
+        return
+    await safe_edit_message(
+        query,
+        "📋 Wallet Address\n\n"
+        f"{USDT_TRC20_WALLET or 'Wallet is not configured.'}",
+        reply_markup=build_subscription_keyboard(),
+    )
+
+
+async def subscription_verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Guide admin through payment verification path."""
+    del context
+    query = update.callback_query
+    if query is None:
+        return
+    await safe_edit_message(
+        query,
+        "💰 Verify Payment\n\n"
+        "1) Create request: /renew <plan_code>\n"
+        "2) Submit tx hash: /submitpayment <tx_hash>\n"
+        "3) System verifies on TRON API and activates your plan.",
+        reply_markup=build_subscription_keyboard(),
+    )
+
+
+async def subscription_payment_history_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show recent payment history for current admin scope."""
+    del context
+    query = update.callback_query
+    if query is None:
+        return
+
+    user = update.effective_user
+    if user is None:
+        return
+    admin_id = await get_admin_for_user(user.id)
+    if admin_id is None and is_owner(update):
+        admin_id = user.id
+    if admin_id is None:
+        await safe_edit_message(query, "Admin scope not found.", reply_markup=build_subscription_keyboard())
+        return
+
+    rows = await get_payment_history(int(admin_id), limit=10)
+    if not rows:
+        text = "📜 Payment History\n\nNo payments recorded yet."
+    else:
+        lines = ["📜 Payment History"]
+        for row in rows[:10]:
+            lines.append(
+                f"- {row.get('created_at')[:19]} | {row.get('plan_code')} | {row.get('amount_usdt')} USDT | {row.get('status')}"
+            )
+        text = "\n".join(lines)
+    await safe_edit_message(query, text, reply_markup=build_subscription_keyboard())
+
+
+async def subscription_back_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Return from subscription view to the role dashboard shortcut."""
+    role = await get_request_role(update)
+    if role == ROLE_ADMIN:
+        await admin_menu_callback(update, context)
+        return
+    if is_owner(update):
+        await owner_menu_callback(update, context)
+        return
+    query = update.callback_query
+    if query is not None:
+        await safe_edit_message(query, "Use /start to open the dashboard.")
 
 
 async def renew_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

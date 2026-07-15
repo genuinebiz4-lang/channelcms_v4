@@ -44,7 +44,7 @@ from keyboards.workspace import (
     build_workspace_delete_confirm_keyboard,
     build_workspace_list_keyboard,
 )
-from states import WAITING_MEDIA_UPLOAD
+from states import WAITING_MEDIA_UPLOAD, WAITING_WORKSPACE_NAME
 from utils.logger import get_logger
 from utils.permissions import ROLE_ADMIN, ROLE_EDITOR, can_publish_content, get_request_role, is_owner
 from utils.telegram_safety import safe_edit_message
@@ -161,27 +161,70 @@ async def create_workspace_command(update: Update, context: ContextTypes.DEFAULT
     text = update.effective_message.text or ""
     parts = text.split(maxsplit=1)
     if len(parts) < 2:
-        await update.effective_message.reply_text("Usage: /createworkspace Workspace Name | optional description")
+        context.user_data["workspace_state"] = WAITING_WORKSPACE_NAME
+        await update.effective_message.reply_text(
+            "Send workspace name now.\n"
+            "Optional format: Workspace Name | description"
+        )
         return
 
-    payload = _split_pipe(parts[1])
+    await _create_workspace_from_text(update, context, parts[1])
+
+
+async def _create_workspace_from_text(update: Update, context: ContextTypes.DEFAULT_TYPE, raw_text: str) -> None:
+    """Create and auto-select workspace from provided text payload."""
+    payload = _split_pipe(raw_text)
     name = payload[0] if payload else ""
     description = payload[1] if len(payload) > 1 else None
+
+    if not name.strip():
+        await update.effective_message.reply_text(
+            "Workspace name cannot be empty. Send a valid name."
+        )
+        context.user_data["workspace_state"] = WAITING_WORKSPACE_NAME
+        return
 
     admin_id = await _resolve_admin_scope(update)
     if admin_id is None:
         await update.effective_message.reply_text("Admin scope not found.")
+        context.user_data.pop("workspace_state", None)
         return
 
     ok, message, ws = await create_workspace(admin_id, name, description)
     if not ok:
         await update.effective_message.reply_text(f"❌ {message}")
+        context.user_data["workspace_state"] = WAITING_WORKSPACE_NAME
+        return
+
+    user = update.effective_user
+    if user is None:
+        context.user_data.pop("workspace_state", None)
         return
 
     await set_current_workspace(user.id, admin_id, int(ws["workspace_id"]))
     await audit_action(user.id, "workspace_created", admin_id, {"workspace_id": ws["workspace_id"], "name": ws["workspace_name"]})
     logger.info("Workspace created admin=%s workspace=%s", admin_id, ws["workspace_id"])
-    await update.effective_message.reply_text(f"✅ Workspace created: {ws['workspace_name']} (ID: {ws['workspace_id']})")
+    context.user_data.pop("workspace_state", None)
+    await update.effective_message.reply_text(
+        "✅ Workspace created successfully.\n"
+        f"Name: {ws['workspace_name']}\n"
+        f"Workspace ID: {ws['workspace_id']}\n"
+        "Selected as current workspace."
+    )
+
+
+async def receive_workspace_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle follow-up workspace name input after /createworkspace."""
+    message = update.effective_message
+    if message is None:
+        return
+
+    text = (message.text or "").strip()
+    if not text:
+        await message.reply_text("Please send a workspace name.")
+        return
+
+    await _create_workspace_from_text(update, context, text)
 
 
 async def workspaces_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -13,7 +13,8 @@ def build_scheduler_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton("📅 Schedule Post", callback_data="scheduler:schedule")],
         [InlineKeyboardButton("📆 Scheduled Posts", callback_data="scheduler:list")],
-        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:channels")],
+        [InlineKeyboardButton("⬅ Back", callback_data="dashboard:home")],
+        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")],
     ]
     return InlineKeyboardMarkup(buttons)
 
@@ -26,6 +27,7 @@ def build_schedule_actions_keyboard(schedule_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton("✏ Edit", callback_data=f"scheduler:edit:{schedule_id}")],
         [InlineKeyboardButton("🗑 Delete", callback_data=f"scheduler:delete:{schedule_id}")],
         [InlineKeyboardButton("🔄 Refresh", callback_data="scheduler:list")],
-        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:channels")],
+        [InlineKeyboardButton("⬅ Back", callback_data="scheduler:list")],
+        [InlineKeyboardButton("🏠 Dashboard", callback_data="dashboard:home")],
     ]
     return InlineKeyboardMarkup(buttons)

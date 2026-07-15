@@ -7,9 +7,15 @@ import json
 from telegram import InputMediaPhoto, InputMediaVideo, Update
 from telegram.ext import ContextTypes
 
-from database.channels import get_channels, get_default_channel
+from database.channels import (
+    get_channels,
+    get_channels_for_admin,
+    get_default_channel,
+    get_default_channel_for_admin,
+)
 from database.approval import cancel_for_draft, mark_published_for_draft
 from database.enterprise import create_notification, log_audit, record_publish
+from database.settings import get_admin_for_user
 from database.drafts import (
     delete,
     get_latest,
@@ -432,12 +438,21 @@ async def publish_post(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await _send_or_edit(update, "❌ Draft is empty or invalid.", keyboard=build_post_keyboard())
         return
 
-    channels = await get_channels()
+    admin_scope = None
+    if update.effective_user is not None:
+        admin_scope = await get_admin_for_user(update.effective_user.id)
+
+    if admin_scope is not None:
+        channels = await get_channels_for_admin(int(admin_scope))
+        default_channel = await get_default_channel_for_admin(int(admin_scope))
+    else:
+        channels = await get_channels()
+        default_channel = await get_default_channel()
+
     if not channels:
         await _send_or_edit(update, "❌ No channels available for publishing.", keyboard=build_post_keyboard())
         return
 
-    default_channel = await get_default_channel()
     if default_channel is not None:
         await publish_to_channel(update, context, int(default_channel["channel_id"]))
         return
@@ -463,6 +478,15 @@ async def publish_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if not draft:
         await _send_or_edit(update, "❌ No draft available to publish.", keyboard=build_post_keyboard())
         return
+
+    admin_scope = None
+    if update.effective_user is not None:
+        admin_scope = await get_admin_for_user(update.effective_user.id)
+    if admin_scope is not None:
+        allowed = {int(row["channel_id"]) for row in await get_channels_for_admin(int(admin_scope))}
+        if int(channel_id) not in allowed:
+            await _send_or_edit(update, "❌ Destination is outside your assigned scope.", keyboard=build_post_keyboard())
+            return
 
     actor_id = int(update.effective_user.id) if update.effective_user else 0
     draft_id = int(draft.get("id") or 0)

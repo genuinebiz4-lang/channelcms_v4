@@ -45,7 +45,15 @@ from handlers.workspace import (
     workspace_delete_yes_callback,
     workspace_switch_callback,
 )
-from handlers.commercial import admin_menu_callback, editor_menu_callback, owner_menu_callback
+from handlers.commercial import (
+    admin_menu_callback,
+    editor_menu_callback,
+    owner_menu_callback,
+    subscription_back_callback,
+    subscription_copy_wallet_callback,
+    subscription_payment_history_callback,
+    subscription_verify_payment_callback,
+)
 from handlers.provisioning import (
     add_admin_cancel_callback,
     add_admin_confirm_callback,
@@ -62,20 +70,24 @@ from handlers.scheduler import (
     scheduler_dashboard,
 )
 from handlers.settings import settings_dashboard, toggle_approval_workflow
+from handlers.start import send_dashboard
 from utils.logger import get_logger
 from utils.telegram_safety import safe_answer
 
 logger = get_logger(__name__)
-CALLBACK_DATA_RE = re.compile(r"^[a-z_]+(?::[a-z0-9_]+)*$")
+CALLBACK_DATA_RE = re.compile(r"^[a-z_]+(?::[-a-z0-9_]+)*$")
 
 
 def _parse_callback_int(data: str, *, prefix: str) -> int | None:
     if not data.startswith(prefix):
         return None
     value = data.removeprefix(prefix)
-    if not value.isdigit():
+    if not value:
         return None
-    return int(value)
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -105,6 +117,10 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if data == "dashboard:channels":
         await safe_answer(query)
         await channel_dashboard(update, context)
+        return
+
+    if data == "dashboard:home":
+        await send_dashboard(update, context)
         return
 
     if data == "dashboard:workspaces":
@@ -140,6 +156,26 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if data == "dashboard:editor_approval":
         await safe_answer(query)
         await editor_menu_callback(update, context)
+        return
+
+    if data == "commercial:copy_wallet":
+        await safe_answer(query)
+        await subscription_copy_wallet_callback(update, context)
+        return
+
+    if data == "commercial:verify_payment":
+        await safe_answer(query)
+        await subscription_verify_payment_callback(update, context)
+        return
+
+    if data == "commercial:payment_history":
+        await safe_answer(query)
+        await subscription_payment_history_callback(update, context)
+        return
+
+    if data == "commercial:back":
+        await safe_answer(query)
+        await subscription_back_callback(update, context)
         return
 
     if data == "settings:dashboard":

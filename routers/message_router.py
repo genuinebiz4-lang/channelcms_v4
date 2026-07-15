@@ -21,7 +21,7 @@ from handlers.provisioning import (
     receive_editor_forward,
     receive_editor_workspace,
 )
-from handlers.workspace import receive_media_upload
+from handlers.workspace import receive_media_upload, receive_workspace_name
 from handlers.scheduler import (
     confirm_schedule,
     receive_date,
@@ -56,6 +56,7 @@ from states import (
     WAITING_ADMIN_FORWARD,
     WAITING_APPROVAL_REJECT_REASON,
     WAITING_MEDIA_UPLOAD,
+    WAITING_WORKSPACE_NAME,
     WAITING_TEXT,
     WAITING_VIDEO,
 )
@@ -93,6 +94,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if context.user_data.get("workspace_state") == WAITING_MEDIA_UPLOAD:
         await receive_media_upload(update, context)
+        return
+    if context.user_data.get("workspace_state") == WAITING_WORKSPACE_NAME:
+        await receive_workspace_name(update, context)
         return
 
     post_state = context.user_data.get("post_state")

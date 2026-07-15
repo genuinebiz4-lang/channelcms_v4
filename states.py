@@ -30,6 +30,7 @@ WAITING_EDITOR_WORKSPACE = "waiting_editor_workspace"
 WAITING_EDITOR_DESTINATIONS = "waiting_editor_destinations"
 WAITING_APPROVAL_REJECT_REASON = "waiting_approval_reject_reason"
 WAITING_MEDIA_UPLOAD = "waiting_media_upload"
+WAITING_WORKSPACE_NAME = "waiting_workspace_name"
 
 WAITING_TEXT = WAITING_POST_TEXT
 WAITING_PHOTO = WAITING_POST_PHOTO
